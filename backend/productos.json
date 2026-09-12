@@ -1,0 +1,18 @@
+[
+    {
+      "id": 1,
+      "icono": "💻",
+      "nombre": "MacBook Pro M3",
+      "descripcion": "Chip M3 Pro, 18GB RAM, 512GB SSD",
+      "precio": "$8.999.000",
+      "imagen": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400"
+    },
+    {
+      "id": 2,
+      "icono": "📱",
+      "nombre": "iPhone 15 Pro",
+      "descripcion": "Titanio, cámara 48MP, USB-C",
+      "precio": "$4.499.000",
+      "imagen": "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=400"
+    }
+  ]
