@@ -1,0 +1,387 @@
+{
+  "info": {
+    "_postman_id": "f3941c09-ca2f-49e7-a148-969423b1b3a9",
+    "name": "Ecovoz",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "57395954",
+    "_collection_link": "https://go.postman.co/collection/57395954-f3941c09-ca2f-49e7-a148-969423b1b3a9?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST Registro Ciudadano",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nombre\": \"Michael\",\n    \"email\": \"michael21@gmail.com\",\n    \"password\": \"michael12345\",\n    \"rol\": \"ciudadano\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Registra un nuevo usuario ciudadano. El rol se asigna automáticamente como \"ciudadano\"."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Login Ciudadano",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const datos = pm.response.json();",
+                  "if (datos.token) {",
+                  "  pm.environment.set('token', datos.token);",
+                  "  console.log('✅ Token guardado');",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"michael22@gmail.com\",\n  \"password\": \"michael12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Autentica un ciudadano y devuelve un token JWT. Guarda el token en `{{token}}`."
+          },
+          "response": [
+            {
+              "name": "POST Login Ciudadano",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"michael21@gmail.com\",\n  \"password\": \"michael12345\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/api/auth/login",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "JSON",
+              "header": [
+                {
+                  "key": "X-Powered-By",
+                  "value": "Express",
+                  "type": "text"
+                },
+                {
+                  "key": "Access-Control-Allow-Origin",
+                  "value": "*",
+                  "type": "text"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8",
+                  "type": "text"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "284",
+                  "type": "text"
+                },
+                {
+                  "key": "ETag",
+                  "value": "W/\"11c-y3zwtvbOc8sbVxt33sOvNMeBZW0\"",
+                  "type": "text"
+                },
+                {
+                  "key": "Date",
+                  "value": "Sat, 19 Sep 2026 02:19:04 GMT",
+                  "type": "text"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive",
+                  "type": "text"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=5",
+                  "type": "text"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhYWRkZjYyZWU4YTk0MTE1MjY4MDYyNiIsImVtYWlsIjoibWljaGFlbDIxQGdtYWlsLmNvbSIsInJvbCI6ImNpdWRhZGFubyIsImlhdCI6MTc4OTc4NDM0NCwiZXhwIjoxNzg5ODcwNzQ0fQ.TeVKERr3_sBf_Wr16LuTqF9Py3N5z0CkhS7dbgDlr2Q\",\n    \"nombre\": \"Michael\",\n    \"rol\": \"ciudadano\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.environment.set(\"token\", res.token);",
+                  "// Después del login, {{token}} se llena automáticamente"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\"email\": \"admin23@ecovoz.com\",\n\"password\": \"admin12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Autentica un administrador y devuelve un token JWT. Guarda el token en `{{token}}`."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Registro Admin",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Admin Inalik\",\n  \"email\": \"admin23@ecovoz.com\",\n  \"password\": \"admin12345\",\n  \"rol\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Registra un usuario con rol admin."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reportes",
+      "item": [
+        {
+          "name": "GET Todos los reportes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/reportes",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "reportes"
+              ]
+            },
+            "description": "Lista todos los reportes registrados en Ecovoz."
+          },
+          "response": []
+        },
+        {
+          "name": "GET Reporte por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/reportes/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "reportes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Obtiene un reporte por su ID. Público."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Crear reporte (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/reportes",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "reportes"
+              ]
+            },
+            "description": "Crea un reporte. Requiere token de admin."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Actualizar reporte (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/reportes/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "reportes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Actualiza un reporte por ID. Requiere token de admin."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE Eliminar reporte (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/reportes/:id",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "reportes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Elimina un reporte por ID. Requiere token de admin."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": []
+    }
+  ]
+}
