@@ -1,1 +1,19 @@
+# Dependencias
 node_modules/
+.pnpm-store/
+
+# Lockfiles de otros gestores (solo conserva pnpm-lock.yaml)
+package-lock.json
+yarn.lock
+
+# Entorno
+.env
+*.env
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+
+# Sistema operativo
+.DS_Store
+**/.DS_Store

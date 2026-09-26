@@ -40,6 +40,44 @@ router.post('/registro', async (req, res) => {
   }
 });
 
+// POST /api/auth/registro-funcionario
+router.post('/registro-funcionario', async (req, res) => {
+  try {
+    const { nombre, email, password, funcionarioSecret } = req.body;
+
+    if (funcionarioSecret !== process.env.FUNCIONARIO_SECRET) {
+      return res.status(403).json({ error: 'Código de funcionario inválido' });
+    }
+
+    if (!nombre || !email || !password) {
+      return res.status(400).json({ error: 'Nombre, email y password son obligatorios' });
+    }
+
+    const existe = await Usuario.findOne({ email });
+    if (existe) return res.status(400).json({ error: 'El email ya está registrado' });
+
+    const hash = await bcrypt.hash(password, 10);
+    const usuario = await Usuario.create({
+      nombre,
+      email,
+      password: hash,
+      rol: 'funcionario'
+    });
+
+    res.status(201).json({
+      msg: 'Funcionario creado',
+      usuario: {
+        id: usuario._id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // POST /api/auth/login — iniciar sesión y recibir token
 router.post('/login', async (req, res) => {
   try {
