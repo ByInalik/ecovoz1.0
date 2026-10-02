@@ -11,7 +11,7 @@ const { verificarToken, verificarAdmin } = require('./middleware/auth'); // O aj
 
 // Importar rutas
 const authRoutes    = require('./routes/auth');
-const ReporteRoutes = require('./routes/reporte.routes');
+const ReporteRoutes = require('./routes/reporte');
 
 // 2. Crear la aplicación y definir el puerto
 const app  = express();

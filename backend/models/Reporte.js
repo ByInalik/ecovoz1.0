@@ -45,7 +45,7 @@ const ReporteSchema = new mongoose.Schema({
   },
   sincronizado: {
     type: Boolean,
-    default: true // true = creado online, false = pendiente de sincronizar desde offline
+    default: true // true = creado online, false = pendiente de sincronizar
   },
   creadoPor: {
     type: mongoose.Schema.Types.ObjectId,
