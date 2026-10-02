@@ -5,23 +5,24 @@ require('dotenv').config();
 const express  = require('express');
 const cors     = require('cors');
 const mongoose = require('mongoose');
+const path     = require('path');
 
-// Importar middlewares (necesarios para proteger rutas)
-const { verificarToken, verificarAdmin } = require('./middleware/auth'); // O ajusta la ruta si varían los nombres
-
-// Importar rutas
+// 2. Importar rutas
 const authRoutes    = require('./routes/auth');
 const ReporteRoutes = require('./routes/reporte');
 
-// 2. Crear la aplicación y definir el puerto
+// 3. Crear la aplicación y definir el puerto
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// 3. Activar middlewares globales
+// 4. Activar middlewares globales
 app.use(cors());
 app.use(express.json());
 
-// 4. Rutas principales de la API
+// 5. Servir archivos estáticos (fotos/videos subidos)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// 6. Rutas principales de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/reportes', ReporteRoutes);
 
@@ -30,7 +31,7 @@ app.get('/', (req, res) => {
   res.json({ mensaje: 'Servidor Ecovoz ✅' });
 });
 
-// 5. Conectar a MongoDB Atlas y encender servidor
+// 7. Conectar a MongoDB Atlas y encender servidor
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('✅ Conectado a MongoDB');

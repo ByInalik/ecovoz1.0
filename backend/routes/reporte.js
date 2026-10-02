@@ -3,12 +3,17 @@ const router = express.Router();
 const Reporte = require('../models/Reporte');
 const EstadoReporte = require('../models/EstadoReporte');
 const Comentario = require('../models/Comentario');
+const Evidencia = require('../models/Evidencia');
 const verificarToken = require('../middleware/auth');
 const verificarAdmin = require('../middleware/admin');
 const verificarFuncionario = require('../middleware/funcionario');
+const upload = require('../middleware/upload');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 
 // ============================================
-// 🌐 RUTAS PÚBLICAS
+// 🌐 RUTAS PÚBLICAS — GET
 // ============================================
 
 // GET todos los reportes — público, con filtros avanzados (RF-018)
@@ -99,7 +104,7 @@ router.get('/:id/historial', async (req, res) => {
   }
 });
 
-// GET comentarios de un reporte — requiere token (filtra internos)
+// GET comentarios de un reporte — requiere token (filtra internos) (RF-022)
 router.get('/:id/comentarios', verificarToken, async (req, res) => {
   try {
     const filtro = { reporte: req.params.id };
@@ -115,6 +120,21 @@ router.get('/:id/comentarios', verificarToken, async (req, res) => {
       .sort({ createdAt: 1 });
 
     res.json(comentarios);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET listar evidencias de un reporte — público (RF-010)
+router.get('/:id/evidencias', async (req, res) => {
+  try {
+    const evidencias = await Evidencia.find({ reporte: req.params.id })
+      .populate('subidoPor', 'nombre email')
+      .sort({ createdAt: -1 });
+    res.json(evidencias);
   } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'ID inválido' });
@@ -143,10 +163,10 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================
-// 🔒 RUTAS PROTEGIDAS
+// 🔒 RUTAS PROTEGIDAS — POST
 // ============================================
 
-// POST crear — cualquier usuario autenticado (RF-003)
+// POST crear reporte — cualquier usuario autenticado (RF-003)
 router.post('/', verificarToken, async (req, res) => {
   try {
     const nuevo = await Reporte.create({
@@ -202,6 +222,102 @@ router.post('/:id/comentarios', verificarToken, async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
+// POST subir evidencia — cualquier usuario autenticado (RF-010)
+router.post('/:id/evidencias', verificarToken, upload.single('archivo'), async (req, res) => {
+  try {
+    // 1. Verificar que se subió un archivo
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    }
+
+    // 2. Verificar que el reporte existe
+    const reporte = await Reporte.findById(req.params.id);
+    if (!reporte) {
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Reporte no encontrado' });
+    }
+
+    // 3. Determinar tipo según el mimetype
+    const esVideo = req.file.mimetype.startsWith('video/');
+    const tipo = esVideo ? 'Video' : 'Imagen';
+
+    // 4. Validar tamaño según tipo
+    const tamañoMB = req.file.size / (1024 * 1024);
+    if (tipo === 'Imagen' && tamañoMB > 10) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'La imagen no puede exceder 10 MB' });
+    }
+    if (tipo === 'Video' && tamañoMB > 50) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'El video no puede exceder 50 MB' });
+    }
+
+    // 5. Verificar reglas del SRS: max 5 fotos O 1 video
+    const evidenciasExistentes = await Evidencia.find({ reporte: req.params.id });
+    const fotosActuales = evidenciasExistentes.filter(e => e.tipo === 'Imagen').length;
+    const videosActuales = evidenciasExistentes.filter(e => e.tipo === 'Video').length;
+
+    if (tipo === 'Imagen') {
+      if (fotosActuales >= 5) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: 'Máximo 5 fotos por reporte' });
+      }
+      if (videosActuales > 0) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: 'Solo puedes adjuntar fotos O video, no ambos' });
+      }
+    }
+
+    if (tipo === 'Video') {
+      if (videosActuales >= 1) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: 'Solo se permite 1 video por reporte' });
+      }
+      if (fotosActuales > 0) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: 'Solo puedes adjuntar fotos O video, no ambos' });
+      }
+    }
+
+    // 6. Guardar en la BD
+    const urlPublica = `/uploads/${req.file.filename}`;
+    const evidencia = await Evidencia.create({
+      reporte: req.params.id,
+      tipo,
+      url: urlPublica,
+      nombreOriginal: req.file.originalname,
+      tamaño: req.file.size,
+      mimetype: req.file.mimetype,
+      subidoPor: req.usuario.id
+    });
+
+    res.status(201).json({
+      mensaje: 'Evidencia subida correctamente',
+      evidencia
+    });
+  } catch (err) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'El archivo es demasiado grande (máx 50 MB)' });
+      }
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ============================================
+// 🔒 RUTAS PROTEGIDAS — PUT
+// ============================================
 
 // PUT cambiar estado — solo funcionario o admin (RF-006)
 router.put('/:id/estado', verificarToken, verificarFuncionario, async (req, res) => {
@@ -262,6 +378,10 @@ router.put('/:id', verificarToken, verificarAdmin, async (req, res) => {
   }
 });
 
+// ============================================
+// 🔒 RUTAS PROTEGIDAS — DELETE
+// ============================================
+
 // DELETE eliminar comentario — autor o admin (RF-022)
 router.delete('/:idReporte/comentarios/:idComentario', verificarToken, async (req, res) => {
   try {
@@ -289,16 +409,64 @@ router.delete('/:idReporte/comentarios/:idComentario', verificarToken, async (re
   }
 });
 
+// DELETE eliminar evidencia — autor o admin (RF-010)
+router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, async (req, res) => {
+  try {
+    const evidencia = await Evidencia.findById(req.params.idEvidencia);
+    if (!evidencia) {
+      return res.status(404).json({ error: 'Evidencia no encontrada' });
+    }
+
+    if (evidencia.reporte.toString() !== req.params.idReporte) {
+      return res.status(400).json({ error: 'La evidencia no pertenece a este reporte' });
+    }
+
+    const esAutor = evidencia.subidoPor.toString() === req.usuario.id;
+    const esAdmin = req.usuario.rol === 'admin';
+
+    if (!esAutor && !esAdmin) {
+      return res.status(403).json({
+        error: 'Solo el autor o un admin pueden eliminar esta evidencia'
+      });
+    }
+
+    const rutaArchivo = path.join(__dirname, '..', evidencia.url);
+    if (fs.existsSync(rutaArchivo)) {
+      fs.unlinkSync(rutaArchivo);
+    }
+
+    await Evidencia.findByIdAndDelete(req.params.idEvidencia);
+
+    res.json({ mensaje: 'Evidencia eliminada correctamente' });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE eliminar reporte — solo admin (elimina en cascada)
 router.delete('/:id', verificarToken, verificarAdmin, async (req, res) => {
   try {
     const eliminado = await Reporte.findByIdAndDelete(req.params.id);
     if (!eliminado) return res.status(404).json({ error: 'No encontrado' });
 
+    // Eliminar en cascada
     await EstadoReporte.deleteMany({ reporte: req.params.id });
     await Comentario.deleteMany({ reporte: req.params.id });
 
-    res.json({ mensaje: 'Reporte, historial y comentarios eliminados correctamente' });
+    // Eliminar evidencias físicas + registros en BD
+    const evidencias = await Evidencia.find({ reporte: req.params.id });
+    evidencias.forEach(ev => {
+      const rutaArchivo = path.join(__dirname, '..', ev.url);
+      if (fs.existsSync(rutaArchivo)) {
+        fs.unlinkSync(rutaArchivo);
+      }
+    });
+    await Evidencia.deleteMany({ reporte: req.params.id });
+
+    res.json({ mensaje: 'Reporte, historial, comentarios y evidencias eliminados correctamente' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
