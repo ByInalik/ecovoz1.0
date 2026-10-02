@@ -11,6 +11,8 @@ const upload = require('../middleware/upload');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const auditar = require('../middleware/auditoria');
+const { validarUbicacionGarzón } = require('../utils/validarUbicacion');
 
 // ============================================
 // 🌐 RUTAS PÚBLICAS — GET
@@ -167,20 +169,37 @@ router.get('/:id', async (req, res) => {
 // ============================================
 
 // POST crear reporte — cualquier usuario autenticado (RF-003)
-router.post('/', verificarToken, async (req, res) => {
+router.post('/', verificarToken, auditar('crear_reporte', 'Reporte'), async (req, res) => {
   try {
+    const { latitud, longitud } = req.body;
+
+    // Validar ubicación dentro de Garzón (RF-025)
+    const validacion = validarUbicacionGarzón(latitud, longitud);
+    if (!validacion.valido) {
+      return res.status(400).json({
+        error: validacion.mensaje,
+        distancia: validacion.distancia,
+        centroGarzón: { lat: 2.1960, lng: -75.6269 }
+      });
+    }
+
     const nuevo = await Reporte.create({
       ...req.body,
       creadoPor: req.usuario.id
     });
-    res.status(201).json(nuevo);
+
+    res.status(201).json({
+      mensaje: 'Reporte creado correctamente',
+      distanciaAlCentro: validacion.distancia,
+      reporte: nuevo
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
 // POST crear comentario — cualquier usuario autenticado (RF-022)
-router.post('/:id/comentarios', verificarToken, async (req, res) => {
+router.post('/:id/comentarios', verificarToken, auditar('crear_comentario', 'Comentario'), async (req, res) => {
   try {
     const { texto, tipo, respondeA } = req.body;
 
@@ -224,7 +243,7 @@ router.post('/:id/comentarios', verificarToken, async (req, res) => {
 });
 
 // POST subir evidencia — cualquier usuario autenticado (RF-010)
-router.post('/:id/evidencias', verificarToken, upload.single('archivo'), async (req, res) => {
+router.post('/:id/evidencias', verificarToken, auditar('subir_evidencia', 'Evidencia'), upload.single('archivo'), async (req, res) => {
   try {
     // 1. Verificar que se subió un archivo
     if (!req.file) {
@@ -320,7 +339,7 @@ router.post('/:id/evidencias', verificarToken, upload.single('archivo'), async (
 // ============================================
 
 // PUT cambiar estado — solo funcionario o admin (RF-006)
-router.put('/:id/estado', verificarToken, verificarFuncionario, async (req, res) => {
+router.put('/:id/estado', verificarToken, verificarFuncionario, auditar('cambiar_estado', 'Reporte'), async (req, res) => {
   try {
     const { estado, comentario } = req.body;
 
@@ -364,7 +383,7 @@ router.put('/:id/estado', verificarToken, verificarFuncionario, async (req, res)
 });
 
 // PUT actualizar todo — solo admin
-router.put('/:id', verificarToken, verificarAdmin, async (req, res) => {
+router.put('/:id', verificarToken, verificarAdmin, auditar('actualizar_reporte', 'Reporte'), async (req, res) => {
   try {
     const actualizado = await Reporte.findByIdAndUpdate(
       req.params.id,
@@ -383,7 +402,7 @@ router.put('/:id', verificarToken, verificarAdmin, async (req, res) => {
 // ============================================
 
 // DELETE eliminar comentario — autor o admin (RF-022)
-router.delete('/:idReporte/comentarios/:idComentario', verificarToken, async (req, res) => {
+router.delete('/:idReporte/comentarios/:idComentario', verificarToken, auditar('eliminar_comentario', 'Comentario'), async (req, res) => {
   try {
     const comentario = await Comentario.findById(req.params.idComentario);
     if (!comentario) {
@@ -410,7 +429,7 @@ router.delete('/:idReporte/comentarios/:idComentario', verificarToken, async (re
 });
 
 // DELETE eliminar evidencia — autor o admin (RF-010)
-router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, async (req, res) => {
+router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, auditar('eliminar_evidencia', 'Evidencia'), async (req, res) => {
   try {
     const evidencia = await Evidencia.findById(req.params.idEvidencia);
     if (!evidencia) {
@@ -447,7 +466,7 @@ router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, async (req,
 });
 
 // DELETE eliminar reporte — solo admin (elimina en cascada)
-router.delete('/:id', verificarToken, verificarAdmin, async (req, res) => {
+router.delete('/:id', verificarToken, verificarAdmin, auditar('eliminar_reporte', 'Reporte'), async (req, res) => {
   try {
     const eliminado = await Reporte.findByIdAndDelete(req.params.id);
     if (!eliminado) return res.status(404).json({ error: 'No encontrado' });

@@ -5,6 +5,7 @@ const Reporte = require('../models/Reporte');
 const Comentario = require('../models/Comentario');
 const verificarToken = require('../middleware/auth');
 const verificarAdmin = require('../middleware/admin');
+const auditar = require('../middleware/auditoria');
 
 // Todas las rutas requieren token de admin
 router.use(verificarToken);
@@ -79,7 +80,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT cambiar rol — admin
-router.put('/:id/rol', async (req, res) => {
+router.put('/:id/rol', auditar('cambiar_rol', 'Usuario'), async (req, res) => {
   try {
     const { rol } = req.body;
 
@@ -122,7 +123,7 @@ router.put('/:id/rol', async (req, res) => {
 });
 
 // PUT activar/desactivar usuario — admin
-router.put('/:id/estado', async (req, res) => {
+router.put('/:id/estado', auditar('cambiar_estado_usuario', 'Usuario'), async (req, res) => {
   try {
     const { activo } = req.body;
 
@@ -158,7 +159,7 @@ router.put('/:id/estado', async (req, res) => {
 });
 
 // DELETE eliminar usuario — admin
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auditar('eliminar_usuario', 'Usuario'), async (req, res) => {
   try {
     // Evitar que un admin se elimine a sí mismo
     if (req.params.id === req.usuario.id) {
