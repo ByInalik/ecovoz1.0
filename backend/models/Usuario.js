@@ -10,6 +10,10 @@ const usuarioSchema = new mongoose.Schema({
     type: String,
     enum: ['ciudadano', 'funcionario', 'admin'],
     default: 'ciudadano'
+  },
+  estado: {
+    type: Boolean,
+    default: true // true = activo, false = desactivado
   }
 }, { timestamps: true });
 

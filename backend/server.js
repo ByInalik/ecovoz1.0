@@ -10,6 +10,8 @@ const path     = require('path');
 // 2. Importar rutas
 const authRoutes    = require('./routes/auth');
 const ReporteRoutes = require('./routes/reporte');
+const EstadisticasRoutes = require('./routes/estadisticas');
+const UsuariosRoutes = require('./routes/usuarios');
 
 // 3. Crear la aplicación y definir el puerto
 const app  = express();
@@ -25,6 +27,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // 6. Rutas principales de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/reportes', ReporteRoutes);
+app.use('/api/estadisticas', EstadisticasRoutes);
+app.use('/api/usuarios', UsuariosRoutes);
 
 // Ruta de prueba base
 app.get('/', (req, res) => {
