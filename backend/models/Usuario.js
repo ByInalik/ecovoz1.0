@@ -13,7 +13,7 @@ const usuarioSchema = new mongoose.Schema({
   },
   estado: {
     type: Boolean,
-    default: true // true = activo, false = desactivado
+    default: true  // true = activo, false = inactivo
   }
 }, { timestamps: true });
 

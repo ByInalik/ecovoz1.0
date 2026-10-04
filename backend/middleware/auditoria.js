@@ -8,7 +8,6 @@ const LogActividad = require('../models/LogActividad');
  */
 function auditar(accion, entidad = '') {
   return async (req, res, next) => {
-    // Guardar la función original de res.json para interceptar la respuesta
     const originalJson = res.json.bind(res);
 
     res.json = function (body) {
@@ -30,10 +29,11 @@ async function registrarLog(req, res, accion, entidad, respuesta) {
 
     await LogActividad.create({
       usuario: req.usuario?.id || null,
+      usuarioEmail: req.usuario?.email || null,
       accion,
       descripcion: `${req.method} ${req.originalUrl}`,
       entidad,
-      entidadId: req.params.id ? req.params.id : null,
+      entidadId: req.params.id || null,
       metodo: req.method,
       ruta: req.originalUrl,
       ip: req.ip || req.headers['x-forwarded-for'] || '',
@@ -43,7 +43,6 @@ async function registrarLog(req, res, accion, entidad, respuesta) {
         statusCode: res.statusCode,
         params: req.params,
         query: req.query,
-        // Solo incluir error si falló
         error: exito ? undefined : (respuesta?.error || '')
       }
     });
@@ -52,4 +51,39 @@ async function registrarLog(req, res, accion, entidad, respuesta) {
   }
 }
 
+/**
+ * Función auxiliar para registrar una acción manualmente.
+ * Útil para login (porque el usuario aún no está autenticado cuando se ejecuta).
+ * 
+ * Uso:
+ *   await registrarManual({
+ *     req,
+ *     usuario,
+ *     accion: 'login_exitoso',
+ *     entidad: 'Auth',
+ *     exito: true
+ *   });
+ */
+async function registrarManual({ req, usuario, accion, entidad = '', entidadId = null, exito = true, detalle = {} }) {
+  try {
+    await LogActividad.create({
+      usuario: usuario?._id || usuario?.id || null,
+      usuarioEmail: usuario?.email || null,
+      accion,
+      descripcion: `${req.method} ${req.originalUrl}`,
+      entidad,
+      entidadId,
+      metodo: req.method,
+      ruta: req.originalUrl,
+      ip: req.ip || req.headers['x-forwarded-for'] || '',
+      userAgent: req.headers['user-agent'] || '',
+      exito,
+      detalle
+    });
+  } catch (err) {
+    console.error('❌ No se pudo guardar el log manual:', err.message);
+  }
+}
+
 module.exports = auditar;
+module.exports.registrarManual = registrarManual;

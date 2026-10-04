@@ -5,6 +5,7 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
 const router  = express.Router();
+const { registrarManual } = require('../middleware/auditoria');
 
 // POST /api/auth/registro — crear cuenta nueva
 router.post('/registro', async (req, res) => {
@@ -95,12 +96,28 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Email o contraseña incorrectos' });
     }
 
+            // 👇 NUEVA VALIDACIÓN de cuenta desactivada
+    if (usuario.estado === false) {
+      return res.status(403).json({ 
+        error: 'Cuenta desactivada. Contacta al administrador.' 
+      });
+    }
+
     // Crear el token JWT — dura 24 horas
     const token = jwt.sign(
       { id: usuario._id, email: usuario.email, rol: usuario.rol },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+
+      // 🔍 Registrar login exitoso
+    await registrarManual({
+      req,
+      usuario,
+      accion: 'login_exitoso',
+      entidad: 'Auth',
+      exito: true
+    });
 
     res.json({
       token,

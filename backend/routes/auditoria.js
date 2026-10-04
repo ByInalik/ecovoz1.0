@@ -4,32 +4,13 @@ const LogActividad = require('../models/LogActividad');
 const verificarToken = require('../middleware/auth');
 const verificarAdmin = require('../middleware/admin');
 
-// ============================================
-// 📜 AUDITORÍA (RF-021)
-// ============================================
-
-// GET mi actividad — cualquier usuario autenticado
-// ⚠️ DEBE IR ANTES del router.use(verificarAdmin)
-router.get('/mi-actividad', verificarToken, async (req, res) => {
-  try {
-    const logs = await LogActividad.find({ usuario: req.usuario.id })
-      .sort({ createdAt: -1 })
-      .limit(50);
-
-    res.json({
-      total: logs.length,
-      logs
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// El resto de rutas requieren admin
+// Solo admin puede ver la auditoría
 router.use(verificarToken);
 router.use(verificarAdmin);
 
-// GET historial completo — admin
+// ============================================
+// 📋 GET listar logs — admin (RF-021)
+// ============================================
 router.get('/', async (req, res) => {
   try {
     const {
@@ -78,7 +59,6 @@ router.get('/', async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
-      filtrosAplicados: filtro,
       logs
     });
   } catch (err) {
@@ -86,7 +66,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET auditoría de un usuario específico — admin
+// ============================================
+// 📋 GET logs de un usuario específico
+// ============================================
 router.get('/usuario/:id', async (req, res) => {
   try {
     const logs = await LogActividad.find({ usuario: req.params.id })
@@ -94,14 +76,59 @@ router.get('/usuario/:id', async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(100);
 
-    res.json({
-      total: logs.length,
-      logs
-    });
+    res.json(logs);
   } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'ID inválido' });
     }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// 📊 GET resumen — admin
+// ============================================
+router.get('/resumen', async (req, res) => {
+  try {
+    const [porAccion, porExito, total] = await Promise.all([
+      LogActividad.aggregate([
+        { $group: { _id: '$accion', total: { $sum: 1 } } },
+        { $sort: { total: -1 } },
+        { $limit: 10 }
+      ]),
+      LogActividad.aggregate([
+        { $group: { _id: '$exito', total: { $sum: 1 } } }
+      ]),
+      LogActividad.countDocuments()
+    ]);
+
+    res.json({
+      total,
+      porAccion,
+      porExito
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// 🗑️ DELETE limpiar logs antiguos (>90 días) — admin
+// ============================================
+router.delete('/limpiar', async (req, res) => {
+  try {
+    const hace90Dias = new Date();
+    hace90Dias.setDate(hace90Dias.getDate() - 90);
+
+    const resultado = await LogActividad.deleteMany({
+      createdAt: { $lt: hace90Dias }
+    });
+
+    res.json({
+      mensaje: `${resultado.deletedCount} logs antiguos eliminados`,
+      eliminados: resultado.deletedCount
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

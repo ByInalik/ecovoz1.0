@@ -4,24 +4,28 @@ const LogActividadSchema = new mongoose.Schema({
   usuario: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',
-    default: null // null si es acción anónima (ej: login fallido)
+    required: false // puede ser null si el usuario fue eliminado
+  },
+  usuarioEmail: {
+    type: String,
+    required: false // guardamos el email por si el usuario se elimina
   },
   accion: {
     type: String,
     required: true
-    // Ejemplos: 'login', 'crear_reporte', 'cambiar_estado', 'eliminar_usuario'
+    // ej: 'crear_reporte', 'cambiar_rol', 'login_exitoso', 'eliminar_usuario'
   },
   descripcion: {
     type: String,
-    default: ''
+    default: '' // ej: "PUT /api/usuarios/123/rol"
   },
   entidad: {
     type: String,
-    default: '' // 'Reporte', 'Usuario', 'Comentario', etc.
+    default: '' // ej: 'Usuario', 'Reporte', 'Auth'
   },
   entidadId: {
     type: mongoose.Schema.Types.ObjectId,
-    default: null
+    required: false
   },
   metodo: {
     type: String, // GET, POST, PUT, DELETE
@@ -45,15 +49,10 @@ const LogActividadSchema = new mongoose.Schema({
   },
   detalle: {
     type: mongoose.Schema.Types.Mixed,
-    default: {} // Info extra: id afectado, cambios, etc.
+    default: {}
   }
 }, {
   timestamps: true
 });
-
-// Índices para consultas rápidas
-LogActividadSchema.index({ usuario: 1, createdAt: -1 });
-LogActividadSchema.index({ accion: 1 });
-LogActividadSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('LogActividad', LogActividadSchema);
