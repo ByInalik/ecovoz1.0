@@ -19,5 +19,5 @@ pnpm-debug.log*
 **/.DS_Store
 
 # Archivos subidos por usuarios (no van al repo)
-backend/uploads/*
-!backend/uploads/.gitkeep
+uploads/*
+!uploads/.gitkeep
