@@ -32,7 +32,7 @@ const ReporteSchema = new mongoose.Schema({
     required: [true, 'La longitud es obligatoria']
   },
   fotos: [{
-    type: String // URLs de las imágenes
+    type: String
   }],
   esAnonimo: {
     type: Boolean,
@@ -45,12 +45,22 @@ const ReporteSchema = new mongoose.Schema({
   },
   sincronizado: {
     type: Boolean,
-    default: true // true = creado online, false = pendiente de sincronizar
+    default: true
+  },
+  requiereValidacionManual: {
+    type: Boolean,
+    default: false
   },
   creadoPor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',
-    required: true
+    default: null  // 🔽 Ya no es required (puede ser null si el usuario se eliminó)
+  },
+  // 🔽 NUEVO: guarda el ID del usuario original cuando se anonimiza
+  creadoPorOriginal: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Usuario',
+    default: null
   }
 }, {
   timestamps: true

@@ -1,12 +1,12 @@
 // backend/utils/validarUbicacion.js
 
 /**
- * Coordenadas aproximadas del municipio de Garzón, Huila
- * Centro: 2.1960, -75.6269
- * Radio aproximado: 5 km (según SRS)
+ * Coordenadas oficiales del municipio de Garzón, Huila (según SRS)
+ * Centro: 2.1969° N, 75.6269° W
+ * Radio de validación: 5 km (según SRS RF-025)
  */
 const CENTRO_GARZON = {
-  lat: 2.1960,
+  lat: 2.1969,
   lng: -75.6269
 };
 
@@ -36,9 +36,9 @@ function toRad(deg) {
 
 /**
  * Valida que las coordenadas estén dentro del área de Garzón
- * @returns { valido: boolean, distancia: number, mensaje: string }
+ * @returns { valido: boolean, distancia: number|null, mensaje: string }
  */
-function validarUbicacionGarzón(latitud, longitud) {
+function validarUbicacion(latitud, longitud) {
   // Validar que sean números
   if (typeof latitud !== 'number' || typeof longitud !== 'number') {
     return {
@@ -66,7 +66,7 @@ function validarUbicacionGarzón(latitud, longitud) {
     return {
       valido: false,
       distancia: parseFloat(distancia.toFixed(2)),
-      mensaje: `Esta ubicación está a ${distancia.toFixed(2)} km de Garzón. Verifica tu GPS. (Máximo permitido: ${RADIO_MAXIMO_KM} km)`
+      mensaje: `Esta ubicación está a ${distancia.toFixed(2)} km del centro de Garzón. Máximo permitido: ${RADIO_MAXIMO_KM} km.`
     };
   }
 
@@ -78,7 +78,7 @@ function validarUbicacionGarzón(latitud, longitud) {
 }
 
 module.exports = {
-  validarUbicacionGarzón,
+  validarUbicacion,
   calcularDistancia,
   CENTRO_GARZON,
   RADIO_MAXIMO_KM

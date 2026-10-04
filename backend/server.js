@@ -13,6 +13,8 @@ const ReporteRoutes = require('./routes/reporte');
 const EstadisticasRoutes = require('./routes/estadisticas');
 const UsuariosRoutes = require('./routes/usuarios');
 const AuditoriaRoutes = require('./routes/auditoria');
+const PerfilRoutes       = require('./routes/perfil');      
+
 
 // 3. Crear la aplicación y definir el puerto
 const app  = express();
@@ -31,6 +33,7 @@ app.use('/api/reportes', ReporteRoutes);
 app.use('/api/estadisticas', EstadisticasRoutes);
 app.use('/api/usuarios', UsuariosRoutes);
 app.use('/api/auditoria', AuditoriaRoutes);
+app.use('/api/perfil', PerfilRoutes);                        
 
 // Ruta de prueba base
 app.get('/', (req, res) => {

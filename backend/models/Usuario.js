@@ -14,6 +14,15 @@ const usuarioSchema = new mongoose.Schema({
   estado: {
     type: Boolean,
     default: true  // true = activo, false = inactivo
+  },
+  // 🔽 NUEVOS CAMPOS para soft delete (RF-016)
+  eliminado: {
+    type: Boolean,
+    default: false
+  },
+  eliminadoEn: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true });
 

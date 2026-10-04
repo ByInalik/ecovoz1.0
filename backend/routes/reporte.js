@@ -12,7 +12,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const auditar = require('../middleware/auditoria');
-const { validarUbicacionGarzón } = require('../utils/validarUbicacion');
+const { validarUbicacion } = require('../utils/validarUbicacion');
 
 // ============================================
 // 🌐 RUTAS PÚBLICAS — GET
@@ -168,30 +168,61 @@ router.get('/:id', async (req, res) => {
 // 🔒 RUTAS PROTEGIDAS — POST
 // ============================================
 
-// POST crear reporte — cualquier usuario autenticado (RF-003)
+// POST crear reporte — cualquier usuario autenticado (RF-003 + RF-025)
 router.post('/', verificarToken, auditar('crear_reporte', 'Reporte'), async (req, res) => {
   try {
-    const { latitud, longitud } = req.body;
+    const {
+      titulo,
+      descripcion,
+      categoria,
+      subcategoria,
+      ubicacion,
+      latitud,
+      longitud,
+      fotos,
+      esAnonimo,
+      solicitarExcepcion
+    } = req.body;
 
-    // Validar ubicación dentro de Garzón (RF-025)
-    const validacion = validarUbicacionGarzón(latitud, longitud);
+    // Validar ubicación en Garzón (RF-025)
+    const validacion = validarUbicacion(latitud, longitud);
+
     if (!validacion.valido) {
-      return res.status(400).json({
-        error: validacion.mensaje,
-        distancia: validacion.distancia,
-        centroGarzón: { lat: 2.1960, lng: -75.6269 }
-      });
+      // Si el usuario NO solicita excepción, se rechaza
+      if (solicitarExcepcion !== true) {
+        return res.status(400).json({
+          error: validacion.mensaje,
+          distancia: validacion.distancia,
+          puedeSolicitarExcepcion: true,
+          hint: 'Envía "solicitarExcepcion": true si estás seguro de la ubicación'
+        });
+      }
+      // Si solicita excepción, se guarda pero marcado para validación manual
     }
 
     const nuevo = await Reporte.create({
-      ...req.body,
-      creadoPor: req.usuario.id
+      titulo,
+      descripcion,
+      categoria,
+      subcategoria,
+      ubicacion,
+      latitud,
+      longitud,
+      fotos,
+      esAnonimo,
+      creadoPor: req.usuario.id,
+      requiereValidacionManual: !validacion.valido // ⬅️ true si está fuera del radio
     });
 
     res.status(201).json({
-      mensaje: 'Reporte creado correctamente',
-      distanciaAlCentro: validacion.distancia,
-      reporte: nuevo
+      mensaje: validacion.valido
+        ? 'Reporte creado correctamente'
+        : 'Reporte creado, pero requiere validación manual por estar fuera del área de Garzón',
+      reporte: nuevo,
+      validacionUbicacion: {
+        valido: validacion.valido,
+        distancia: validacion.distancia
+      }
     });
   } catch (err) {
     res.status(400).json({ error: err.message });

@@ -9,7 +9,13 @@ const ComentarioSchema = new mongoose.Schema({
   autor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',
-    required: true
+    default: null  // 🔽 ahora puede ser null
+  },
+  // 🔽 NUEVO: guarda el ID original al anonimizar
+  autorOriginal: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Usuario',
+    default: null
   },
   texto: {
     type: String,
@@ -23,14 +29,13 @@ const ComentarioSchema = new mongoose.Schema({
     enum: ['publico', 'interno'],
     default: 'publico'
   },
-  // Para responder a otro comentario (hilo)
   respondeA: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Comentario',
     default: null
   }
 }, {
-  timestamps: true // createdAt, updatedAt
+  timestamps: true
 });
 
 module.exports = mongoose.model('Comentario', ComentarioSchema);
