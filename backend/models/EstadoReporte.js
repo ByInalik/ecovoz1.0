@@ -16,7 +16,7 @@ const EstadoReporteSchema = new mongoose.Schema({
   },
   comentario: {
     type: String,
-    default: '' // Comentario del funcionario explicando el cambio
+    default: ''
   },
   cambiadoPor: {
     type: mongoose.Schema.Types.ObjectId,

@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+pnpm-lock.yaml text eol=lf

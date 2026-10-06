@@ -13,12 +13,14 @@ const fs = require('fs');
 const path = require('path');
 const auditar = require('../middleware/auditoria');
 const { validarUbicacion } = require('../utils/validarUbicacion');
+const { registrarManual } = require('../middleware/auditoria');
+const { generarPDFReporte } = require('../utils/generarPDF');
 
 // ============================================
 // 🌐 RUTAS PÚBLICAS — GET
 // ============================================
 
-// GET todos los reportes — público, con filtros avanzados (RF-018)
+// GET todos los reportes — público, con filtros avanzados (RF-018 + RF-019)
 router.get('/', async (req, res) => {
   try {
     const {
@@ -28,6 +30,7 @@ router.get('/', async (req, res) => {
       hasta,
       buscar,
       creadoPor,
+      incluirNoAprobados,
       page = 1,
       limit = 20,
       orden = 'createdAt',
@@ -39,6 +42,13 @@ router.get('/', async (req, res) => {
     if (categoria) filtro.categoria = categoria;
     if (estado) filtro.estado = estado;
     if (creadoPor) filtro.creadoPor = creadoPor;
+
+    const incluirTodos = incluirNoAprobados === 'true';
+    if (!incluirTodos) {
+      filtro.estado = filtro.estado
+        ? filtro.estado
+        : { $nin: ['Pendiente de moderación', 'Rechazado'] };
+    }
 
     if (desde || hasta) {
       filtro.createdAt = {};
@@ -91,7 +101,7 @@ router.get('/', async (req, res) => {
 // 🔍 RUTAS ESPECÍFICAS (deben ir ANTES que /:id)
 // ============================================
 
-// GET historial de cambios de estado — público (RF-006)
+// GET historial de cambios — público (RF-006)
 router.get('/:id/historial', async (req, res) => {
   try {
     const historial = await EstadoReporte.find({ reporte: req.params.id })
@@ -106,11 +116,10 @@ router.get('/:id/historial', async (req, res) => {
   }
 });
 
-// GET comentarios de un reporte — requiere token (filtra internos) (RF-022)
+// GET comentarios — requiere token (filtra internos) (RF-022)
 router.get('/:id/comentarios', verificarToken, async (req, res) => {
   try {
     const filtro = { reporte: req.params.id };
-
     const esStaff = req.usuario.rol === 'funcionario' || req.usuario.rol === 'admin';
     if (!esStaff) {
       filtro.tipo = 'publico';
@@ -130,7 +139,7 @@ router.get('/:id/comentarios', verificarToken, async (req, res) => {
   }
 });
 
-// GET listar evidencias de un reporte — público (RF-010)
+// GET evidencias — público (RF-010)
 router.get('/:id/evidencias', async (req, res) => {
   try {
     const evidencias = await Evidencia.find({ reporte: req.params.id })
@@ -146,15 +155,102 @@ router.get('/:id/evidencias', async (req, res) => {
 });
 
 // ============================================
-// 🌐 RUTA GENÉRICA POR ID (debe ir AL FINAL de los GET)
+// 📄 EXPORTAR A PDF — RF-017
+// (Debe ir ANTES de GET /:id)
+// ============================================
+router.get('/:id/pdf', verificarToken, async (req, res) => {
+  try {
+    const reporte = await Reporte.findById(req.params.id)
+      .populate('creadoPor', 'nombre email');
+
+    if (!reporte) {
+      return res.status(404).json({ error: 'Reporte no encontrado' });
+    }
+
+    // Validar permisos: autor, funcionario o admin
+    const esAutor = reporte.creadoPor?._id?.toString() === req.usuario.id;
+    const esStaff = req.usuario.rol === 'funcionario' || req.usuario.rol === 'admin';
+
+    if (!esAutor && !esStaff) {
+      return res.status(403).json({
+        error: 'Solo el autor, un funcionario o un admin pueden descargar este PDF'
+      });
+    }
+
+    // Cargar historial y evidencias
+    const [historial, evidencias] = await Promise.all([
+      EstadoReporte.find({ reporte: reporte._id })
+        .populate('cambiadoPor', 'nombre email')
+        .sort({ fechaCambio: 1 }),
+      Evidencia.find({ reporte: reporte._id }).sort({ createdAt: 1 })
+    ]);
+
+    // Configurar headers para descarga
+    const fecha = new Date().toISOString().split('T')[0];
+    const nombreArchivo = `EcoVoz_Reporte_${reporte._id}_${fecha}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+
+    // Generar y enviar el PDF (streaming)
+    const doc = generarPDFReporte(reporte, historial, evidencias);
+    doc.pipe(res);
+
+    // Registrar en auditoría (sin await para no bloquear el streaming)
+    registrarManual({
+      req,
+      usuario: req.usuario,
+      accion: 'exportar_pdf',
+      entidad: 'Reporte',
+      entidadId: reporte._id,
+      exito: true
+    }).catch(err => console.error('Error auditando PDF:', err.message));
+
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+    console.error('Error generando PDF:', err);
+    res.status(500).json({ error: 'Error generando el PDF' });
+  }
+});
+
+// ============================================
+// 🌐 RUTA GENÉRICA POR ID (al final de los GET)
 // ============================================
 
-// GET por ID — público
+// GET por ID — público pero filtra por moderación (RF-019)
 router.get('/:id', async (req, res) => {
   try {
     const item = await Reporte.findById(req.params.id)
       .populate('creadoPor', 'nombre email');
+
     if (!item) return res.status(404).json({ error: 'No encontrado' });
+
+    const estaAprobado = !['Pendiente de moderación', 'Rechazado'].includes(item.estado);
+
+    if (!estaAprobado) {
+      const authHeader = req.headers['authorization'];
+      if (!authHeader) {
+        return res.status(404).json({ error: 'No encontrado' });
+      }
+
+      try {
+        const jwt = require('jsonwebtoken');
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        const esAutor = item.creadoPor?._id?.toString() === decoded.id;
+        const esStaff = decoded.rol === 'funcionario' || decoded.rol === 'admin';
+
+        if (!esAutor && !esStaff) {
+          return res.status(404).json({ error: 'No encontrado' });
+        }
+      } catch (err) {
+        return res.status(404).json({ error: 'No encontrado' });
+      }
+    }
+
     res.json(item);
   } catch (err) {
     if (err.name === 'CastError') {
@@ -168,7 +264,7 @@ router.get('/:id', async (req, res) => {
 // 🔒 RUTAS PROTEGIDAS — POST
 // ============================================
 
-// POST crear reporte — cualquier usuario autenticado (RF-003 + RF-025)
+// POST crear reporte (RF-003 + RF-025 + RF-019)
 router.post('/', verificarToken, auditar('crear_reporte', 'Reporte'), async (req, res) => {
   try {
     const {
@@ -184,20 +280,15 @@ router.post('/', verificarToken, auditar('crear_reporte', 'Reporte'), async (req
       solicitarExcepcion
     } = req.body;
 
-    // Validar ubicación en Garzón (RF-025)
     const validacion = validarUbicacion(latitud, longitud);
 
-    if (!validacion.valido) {
-      // Si el usuario NO solicita excepción, se rechaza
-      if (solicitarExcepcion !== true) {
-        return res.status(400).json({
-          error: validacion.mensaje,
-          distancia: validacion.distancia,
-          puedeSolicitarExcepcion: true,
-          hint: 'Envía "solicitarExcepcion": true si estás seguro de la ubicación'
-        });
-      }
-      // Si solicita excepción, se guarda pero marcado para validación manual
+    if (!validacion.valido && solicitarExcepcion !== true) {
+      return res.status(400).json({
+        error: validacion.mensaje,
+        distancia: validacion.distancia,
+        puedeSolicitarExcepcion: true,
+        hint: 'Envía "solicitarExcepcion": true si estás seguro de la ubicación'
+      });
     }
 
     const nuevo = await Reporte.create({
@@ -211,13 +302,12 @@ router.post('/', verificarToken, auditar('crear_reporte', 'Reporte'), async (req
       fotos,
       esAnonimo,
       creadoPor: req.usuario.id,
-      requiereValidacionManual: !validacion.valido // ⬅️ true si está fuera del radio
+      requiereValidacionManual: !validacion.valido,
+      estado: 'Pendiente de moderación'
     });
 
     res.status(201).json({
-      mensaje: validacion.valido
-        ? 'Reporte creado correctamente'
-        : 'Reporte creado, pero requiere validación manual por estar fuera del área de Garzón',
+      mensaje: 'Reporte creado. Será visible al público después de ser moderado.',
       reporte: nuevo,
       validacionUbicacion: {
         valido: validacion.valido,
@@ -229,22 +319,18 @@ router.post('/', verificarToken, auditar('crear_reporte', 'Reporte'), async (req
   }
 });
 
-// POST crear comentario — cualquier usuario autenticado (RF-022)
-router.post('/:id/comentarios', verificarToken, auditar('crear_comentario', 'Comentario'), async (req, res) => {
+// POST crear comentario (RF-022)
+router.post('/:id/comentarios', verificarToken, async (req, res) => {
   try {
     const { texto, tipo, respondeA } = req.body;
 
     const reporte = await Reporte.findById(req.params.id);
-    if (!reporte) {
-      return res.status(404).json({ error: 'Reporte no encontrado' });
-    }
+    if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
 
     if (tipo === 'interno') {
       const esStaff = req.usuario.rol === 'funcionario' || req.usuario.rol === 'admin';
       if (!esStaff) {
-        return res.status(403).json({
-          error: 'Solo funcionarios pueden crear comentarios internos'
-        });
+        return res.status(403).json({ error: 'Solo funcionarios pueden crear comentarios internos' });
       }
     }
 
@@ -273,26 +359,22 @@ router.post('/:id/comentarios', verificarToken, auditar('crear_comentario', 'Com
   }
 });
 
-// POST subir evidencia — cualquier usuario autenticado (RF-010)
-router.post('/:id/evidencias', verificarToken, auditar('subir_evidencia', 'Evidencia'), upload.single('archivo'), async (req, res) => {
+// POST subir evidencia (RF-010)
+router.post('/:id/evidencias', verificarToken, upload.single('archivo'), async (req, res) => {
   try {
-    // 1. Verificar que se subió un archivo
     if (!req.file) {
       return res.status(400).json({ error: 'No se subió ningún archivo' });
     }
 
-    // 2. Verificar que el reporte existe
     const reporte = await Reporte.findById(req.params.id);
     if (!reporte) {
       fs.unlinkSync(req.file.path);
       return res.status(404).json({ error: 'Reporte no encontrado' });
     }
 
-    // 3. Determinar tipo según el mimetype
     const esVideo = req.file.mimetype.startsWith('video/');
     const tipo = esVideo ? 'Video' : 'Imagen';
 
-    // 4. Validar tamaño según tipo
     const tamañoMB = req.file.size / (1024 * 1024);
     if (tipo === 'Imagen' && tamañoMB > 10) {
       fs.unlinkSync(req.file.path);
@@ -303,7 +385,6 @@ router.post('/:id/evidencias', verificarToken, auditar('subir_evidencia', 'Evide
       return res.status(400).json({ error: 'El video no puede exceder 50 MB' });
     }
 
-    // 5. Verificar reglas del SRS: max 5 fotos O 1 video
     const evidenciasExistentes = await Evidencia.find({ reporte: req.params.id });
     const fotosActuales = evidenciasExistentes.filter(e => e.tipo === 'Imagen').length;
     const videosActuales = evidenciasExistentes.filter(e => e.tipo === 'Video').length;
@@ -330,7 +411,6 @@ router.post('/:id/evidencias', verificarToken, auditar('subir_evidencia', 'Evide
       }
     }
 
-    // 6. Guardar en la BD
     const urlPublica = `/uploads/${req.file.filename}`;
     const evidencia = await Evidencia.create({
       reporte: req.params.id,
@@ -350,14 +430,12 @@ router.post('/:id/evidencias', verificarToken, auditar('subir_evidencia', 'Evide
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'El archivo es demasiado grande (máx 50 MB)' });
       }
       return res.status(400).json({ error: err.message });
     }
-
     if (err.name === 'CastError') {
       return res.status(400).json({ error: 'ID inválido' });
     }
@@ -369,7 +447,81 @@ router.post('/:id/evidencias', verificarToken, auditar('subir_evidencia', 'Evide
 // 🔒 RUTAS PROTEGIDAS — PUT
 // ============================================
 
-// PUT cambiar estado — solo funcionario o admin (RF-006)
+// PUT moderar reporte — funcionario o admin (RF-019)
+router.put('/:id/moderar', verificarToken, verificarFuncionario, auditar('moderar_reporte', 'Reporte'), async (req, res) => {
+  try {
+    const { decision, motivo } = req.body;
+
+    if (!decision || !['aprobar', 'rechazar'].includes(decision)) {
+      return res.status(400).json({
+        error: 'La decisión debe ser "aprobar" o "rechazar"'
+      });
+    }
+
+    const reporte = await Reporte.findById(req.params.id);
+    if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
+
+    if (reporte.estado !== 'Pendiente de moderación') {
+      return res.status(400).json({
+        error: `Este reporte ya fue moderado (estado actual: "${reporte.estado}")`
+      });
+    }
+
+    if (decision === 'rechazar') {
+      if (!motivo || motivo.trim().length < 50) {
+        return res.status(400).json({
+          error: 'El motivo de rechazo es obligatorio y debe tener al menos 50 caracteres'
+        });
+      }
+    }
+
+    const estadoAnterior = reporte.estado;
+
+    if (decision === 'aprobar') {
+      reporte.estado = 'Pendiente';
+      reporte.moderacion = {
+        aprobado: true,
+        moderadoPor: req.usuario.id,
+        fechaModeracion: new Date(),
+        motivoRechazo: ''
+      };
+    } else {
+      reporte.estado = 'Rechazado';
+      reporte.moderacion = {
+        aprobado: false,
+        moderadoPor: req.usuario.id,
+        fechaModeracion: new Date(),
+        motivoRechazo: motivo.trim()
+      };
+    }
+
+    await reporte.save();
+
+    await EstadoReporte.create({
+      reporte: reporte._id,
+      estadoAnterior,
+      estadoNuevo: reporte.estado,
+      comentario: decision === 'aprobar'
+        ? 'Reporte aprobado por moderador'
+        : `Reporte rechazado: ${motivo.trim()}`,
+      cambiadoPor: req.usuario.id
+    });
+
+    res.json({
+      mensaje: decision === 'aprobar'
+        ? 'Reporte aprobado y visible públicamente'
+        : 'Reporte rechazado',
+      reporte
+    });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT cambiar estado — funcionario o admin (RF-006)
 router.put('/:id/estado', verificarToken, verificarFuncionario, auditar('cambiar_estado', 'Reporte'), async (req, res) => {
   try {
     const { estado, comentario } = req.body;
@@ -378,9 +530,19 @@ router.put('/:id/estado', verificarToken, verificarFuncionario, auditar('cambiar
       return res.status(400).json({ error: 'El campo "estado" es obligatorio' });
     }
 
+    if (estado === 'Pendiente de moderación') {
+      return res.status(400).json({
+        error: 'No puedes cambiar manualmente al estado "Pendiente de moderación"'
+      });
+    }
+
     const reporte = await Reporte.findById(req.params.id);
-    if (!reporte) {
-      return res.status(404).json({ error: 'Reporte no encontrado' });
+    if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
+
+    if (reporte.estado === 'Pendiente de moderación') {
+      return res.status(400).json({
+        error: 'El reporte aún no ha sido moderado. Primero debe aprobarse o rechazarse.'
+      });
     }
 
     if (reporte.estado === estado) {
@@ -433,20 +595,16 @@ router.put('/:id', verificarToken, verificarAdmin, auditar('actualizar_reporte',
 // ============================================
 
 // DELETE eliminar comentario — autor o admin (RF-022)
-router.delete('/:idReporte/comentarios/:idComentario', verificarToken, auditar('eliminar_comentario', 'Comentario'), async (req, res) => {
+router.delete('/:idReporte/comentarios/:idComentario', verificarToken, async (req, res) => {
   try {
     const comentario = await Comentario.findById(req.params.idComentario);
-    if (!comentario) {
-      return res.status(404).json({ error: 'Comentario no encontrado' });
-    }
+    if (!comentario) return res.status(404).json({ error: 'Comentario no encontrado' });
 
-    const esAutor = comentario.autor.toString() === req.usuario.id;
+    const esAutor = comentario.autor?.toString() === req.usuario.id;
     const esAdmin = req.usuario.rol === 'admin';
 
     if (!esAutor && !esAdmin) {
-      return res.status(403).json({
-        error: 'Solo el autor o un admin pueden eliminar este comentario'
-      });
+      return res.status(403).json({ error: 'Solo el autor o un admin pueden eliminar este comentario' });
     }
 
     await Comentario.findByIdAndDelete(req.params.idComentario);
@@ -460,24 +618,20 @@ router.delete('/:idReporte/comentarios/:idComentario', verificarToken, auditar('
 });
 
 // DELETE eliminar evidencia — autor o admin (RF-010)
-router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, auditar('eliminar_evidencia', 'Evidencia'), async (req, res) => {
+router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, async (req, res) => {
   try {
     const evidencia = await Evidencia.findById(req.params.idEvidencia);
-    if (!evidencia) {
-      return res.status(404).json({ error: 'Evidencia no encontrada' });
-    }
+    if (!evidencia) return res.status(404).json({ error: 'Evidencia no encontrada' });
 
     if (evidencia.reporte.toString() !== req.params.idReporte) {
       return res.status(400).json({ error: 'La evidencia no pertenece a este reporte' });
     }
 
-    const esAutor = evidencia.subidoPor.toString() === req.usuario.id;
+    const esAutor = evidencia.subidoPor?.toString() === req.usuario.id;
     const esAdmin = req.usuario.rol === 'admin';
 
     if (!esAutor && !esAdmin) {
-      return res.status(403).json({
-        error: 'Solo el autor o un admin pueden eliminar esta evidencia'
-      });
+      return res.status(403).json({ error: 'Solo el autor o un admin pueden eliminar esta evidencia' });
     }
 
     const rutaArchivo = path.join(__dirname, '..', evidencia.url);
@@ -486,7 +640,6 @@ router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, auditar('el
     }
 
     await Evidencia.findByIdAndDelete(req.params.idEvidencia);
-
     res.json({ mensaje: 'Evidencia eliminada correctamente' });
   } catch (err) {
     if (err.name === 'CastError') {
@@ -496,17 +649,15 @@ router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, auditar('el
   }
 });
 
-// DELETE eliminar reporte — solo admin (elimina en cascada)
+// DELETE eliminar reporte — solo admin (cascada)
 router.delete('/:id', verificarToken, verificarAdmin, auditar('eliminar_reporte', 'Reporte'), async (req, res) => {
   try {
     const eliminado = await Reporte.findByIdAndDelete(req.params.id);
     if (!eliminado) return res.status(404).json({ error: 'No encontrado' });
 
-    // Eliminar en cascada
     await EstadoReporte.deleteMany({ reporte: req.params.id });
     await Comentario.deleteMany({ reporte: req.params.id });
 
-    // Eliminar evidencias físicas + registros en BD
     const evidencias = await Evidencia.find({ reporte: req.params.id });
     evidencias.forEach(ev => {
       const rutaArchivo = path.join(__dirname, '..', ev.url);

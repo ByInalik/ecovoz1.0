@@ -40,8 +40,15 @@ const ReporteSchema = new mongoose.Schema({
   },
   estado: {
     type: String,
-    enum: ['Pendiente', 'En revisión', 'En proceso', 'Solucionado'],
-    default: 'Pendiente'
+    enum: [
+      'Pendiente de moderación',   // nace así
+      'Pendiente',                 // aprobado, visible públicamente
+      'En revisión',               // moderador pide más info
+      'En proceso',                // funcionario trabajando
+      'Solucionado',               // terminado
+      'Rechazado'                  // moderador rechazó
+    ],
+    default: 'Pendiente de moderación'
   },
   sincronizado: {
     type: Boolean,
@@ -54,13 +61,19 @@ const ReporteSchema = new mongoose.Schema({
   creadoPor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',
-    default: null  // 🔽 Ya no es required (puede ser null si el usuario se eliminó)
+    default: null
   },
-  // 🔽 NUEVO: guarda el ID del usuario original cuando se anonimiza
   creadoPorOriginal: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',
     default: null
+  },
+  // Campos de moderación (RF-019)
+  moderacion: {
+    aprobado: { type: Boolean, default: false },
+    moderadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', default: null },
+    fechaModeracion: { type: Date, default: null },
+    motivoRechazo: { type: String, default: '' } // solo si rechazado
   }
 }, {
   timestamps: true
