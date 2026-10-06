@@ -17,7 +17,7 @@ const { registrarManual } = require('../middleware/auditoria');
 const { generarPDFReporte } = require('../utils/generarPDF');
 
 // ============================================
-// 🌐 RUTAS PÚBLICAS — GET
+// RUTAS PÚBLICAS — GET
 // ============================================
 
 // GET todos los reportes — público, con filtros avanzados (RF-018 + RF-019)
@@ -98,7 +98,7 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================
-// 🔍 RUTAS ESPECÍFICAS (deben ir ANTES que /:id)
+// RUTAS ESPECÍFICAS (deben ir ANTES que /:id)
 // ============================================
 
 // GET historial de cambios — público (RF-006)
@@ -155,7 +155,7 @@ router.get('/:id/evidencias', async (req, res) => {
 });
 
 // ============================================
-// 📄 EXPORTAR A PDF — RF-017
+// EXPORTAR A PDF — RF-017
 // (Debe ir ANTES de GET /:id)
 // ============================================
 router.get('/:id/pdf', verificarToken, async (req, res) => {
@@ -216,7 +216,7 @@ router.get('/:id/pdf', verificarToken, async (req, res) => {
 });
 
 // ============================================
-// 🌐 RUTA GENÉRICA POR ID (al final de los GET)
+// RUTA GENÉRICA POR ID (al final de los GET)
 // ============================================
 
 // GET por ID — público pero filtra por moderación (RF-019)
@@ -261,7 +261,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================
-// 🔒 RUTAS PROTEGIDAS — POST
+// RUTAS PROTEGIDAS — POST
 // ============================================
 
 // POST crear reporte (RF-003 + RF-025 + RF-019)
@@ -444,7 +444,7 @@ router.post('/:id/evidencias', verificarToken, upload.single('archivo'), async (
 });
 
 // ============================================
-// 🔒 RUTAS PROTEGIDAS — PUT
+// RUTAS PROTEGIDAS — PUT
 // ============================================
 
 // PUT moderar reporte — funcionario o admin (RF-019)
@@ -591,7 +591,7 @@ router.put('/:id', verificarToken, verificarAdmin, auditar('actualizar_reporte',
 });
 
 // ============================================
-// 🔒 RUTAS PROTEGIDAS — DELETE
+// RUTAS PROTEGIDAS — DELETE
 // ============================================
 
 // DELETE eliminar comentario — autor o admin (RF-022)

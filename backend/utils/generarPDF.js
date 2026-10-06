@@ -8,7 +8,6 @@ const path = require('path');
  * @param {Object} reporte - Documento del reporte (populate creadoPor)
  * @param {Array} historial - Array de cambios de estado
  * @param {Array} evidencias - Array de evidencias (fotos/videos)
- * @param {Object} usuario - Usuario que solicita el PDF
  * @returns {PDFDocument} - Stream del PDF
  */
 function generarPDFReporte(reporte, historial = [], evidencias = []) {
@@ -24,34 +23,49 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
   });
 
   // ============================================
-  // 🎨 Colores y estilos
+  // Colores y estilos
   // ============================================
   const COLOR_VERDE = '#16a34a';
   const COLOR_GRIS = '#64748b';
   const COLOR_NEGRO = '#0f172a';
   const COLOR_GRIS_CLARO = '#f1f5f9';
 
+  // Ruta del logo
+  const rutaLogo = path.join(__dirname, '..', 'assets', 'logo.png');
+
   // ============================================
-  // 🏷️ ENCABEZADO
+  // ENCABEZADO
   // ============================================
+
+  // Logo (si existe)
+  if (fs.existsSync(rutaLogo)) {
+    try {
+      doc.image(rutaLogo, 50, 45, { width: 45 });
+    } catch (err) {
+      console.error('Error al cargar logo en PDF:', err.message);
+    }
+  }
+
+  // Título principal (a la derecha del logo)
   doc
     .fillColor(COLOR_VERDE)
-    .fontSize(24)
+    .fontSize(22)
     .font('Helvetica-Bold')
-    .text('🌱 EcoVoz', 50, 50);
+    .text('EcoVoz', 105, 50);
 
   doc
     .fillColor(COLOR_NEGRO)
-    .fontSize(14)
+    .fontSize(11)
     .font('Helvetica')
-    .text('Reporte Ambiental', 50, 80);
+    .text('Reporte Ambiental', 105, 78);
 
   // Código y fecha (alineado a la derecha)
   doc
     .fillColor(COLOR_GRIS)
     .fontSize(9)
-    .text(`Código: ${reporte._id}`, 350, 55, { width: 200, align: 'right' })
-    .text(`Generado: ${new Date().toLocaleString('es-CO')}`, 350, 70, { width: 200, align: 'right' });
+    .font('Helvetica')
+    .text(`Código: ${reporte._id}`, 300, 55, { width: 250, align: 'right' })
+    .text(`Generado: ${new Date().toLocaleString('es-CO')}`, 300, 70, { width: 250, align: 'right' });
 
   // Línea divisoria
   doc
@@ -62,7 +76,7 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
     .stroke();
 
   // ============================================
-  // 📋 DATOS PRINCIPALES
+  // DATOS PRINCIPALES
   // ============================================
   let y = 125;
 
@@ -81,13 +95,13 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
       .fontSize(9)
       .font('Helvetica-Bold')
       .text(etiqueta, 50, y, { width: 120 });
-    
+
     doc
       .fillColor(COLOR_NEGRO)
       .fontSize(10)
       .font('Helvetica')
       .text(valor || 'N/A', 170, y, { width: 375 });
-    
+
     y = doc.y + 5;
   };
 
@@ -96,7 +110,7 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
   escribirCampo('Estado:', reporte.estado);
   escribirCampo('Ubicación:', reporte.ubicacion);
   escribirCampo('Coordenadas:', `${reporte.latitud}, ${reporte.longitud}`);
-  
+
   const autor = reporte.esAnonimo
     ? 'Anónimo'
     : (reporte.creadoPor?.nombre || 'Usuario eliminado');
@@ -105,7 +119,7 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
   escribirCampo('Fecha del reporte:', new Date(reporte.createdAt).toLocaleString('es-CO'));
 
   // ============================================
-  // 📝 DESCRIPCIÓN
+  // DESCRIPCIÓN
   // ============================================
   y += 10;
 
@@ -117,7 +131,6 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
 
   y += 20;
 
-  // Fondo gris claro
   const alturaDescripcion = Math.max(60, doc.heightOfString(reporte.descripcion, { width: 495 }) + 20);
   doc
     .rect(50, y, 495, alturaDescripcion)
@@ -133,9 +146,8 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
   y += alturaDescripcion + 20;
 
   // ============================================
-  // 📊 HISTORIAL DE ESTADOS
+  // HISTORIAL DE ESTADOS
   // ============================================
-  // Verificar si cabe en la página actual
   if (y > 650) {
     doc.addPage();
     y = 50;
@@ -175,13 +187,11 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
     y += 18;
 
     historial.forEach((h, i) => {
-      // Salto de página si es necesario
       if (y > 750) {
         doc.addPage();
         y = 50;
       }
 
-      // Fondo alternado
       if (i % 2 === 0) {
         doc
           .rect(50, y, 495, 20)
@@ -205,12 +215,11 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
   y += 15;
 
   // ============================================
-  // 📎 EVIDENCIAS (FOTOS)
+  // EVIDENCIAS (FOTOS)
   // ============================================
   const fotos = evidencias.filter(e => e.tipo === 'Imagen');
 
   if (fotos.length > 0) {
-    // Salto de página si no caben
     if (y > 600) {
       doc.addPage();
       y = 50;
@@ -230,14 +239,12 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
     let xImagen = 50;
 
     for (const foto of fotos) {
-      // Ruta física del archivo
       const rutaFisica = path.join(__dirname, '..', foto.url);
-      
+
       if (!fs.existsSync(rutaFisica)) {
-        continue; // saltar si no existe la imagen
+        continue;
       }
 
-      // Salto de página si es necesario
       if (y + altoImagen > 750) {
         doc.addPage();
         y = 50;
@@ -251,7 +258,6 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
           align: 'center'
         });
 
-        // Nombre del archivo debajo
         doc
           .fillColor(COLOR_GRIS)
           .fontSize(7)
@@ -261,7 +267,6 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
             align: 'center'
           });
       } catch (err) {
-        // Si falla la imagen (formato raro, corrupta), solo escribe el nombre
         doc
           .fillColor(COLOR_GRIS)
           .fontSize(8)
@@ -272,28 +277,24 @@ function generarPDFReporte(reporte, historial = [], evidencias = []) {
 
       fotosEnFila++;
       if (fotosEnFila === 2) {
-        // Segunda foto en la misma fila
         xImagen = 50;
         y += altoImagen + 20;
         fotosEnFila = 0;
       } else {
-        // Primera foto, mover a la derecha
         xImagen = 305;
       }
     }
 
-    // Ajustar y al final
     if (fotosEnFila > 0) {
       y += altoImagen + 20;
     }
   }
 
   // ============================================
-  // 📄 PIE DE PÁGINA
+  // PIE DE PÁGINA
   // ============================================
   const paginas = doc.bufferedPageRange();
-  
-  // Agregar pie a todas las páginas
+
   for (let i = 0; i < paginas.count; i++) {
     doc.switchToPage(i);
     doc

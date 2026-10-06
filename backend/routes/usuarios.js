@@ -12,7 +12,7 @@ router.use(verificarToken);
 router.use(verificarAdmin);
 
 // ============================================
-// 👥 GESTIÓN DE USUARIOS (RF-020)
+// GESTIÓN DE USUARIOS (RF-020)
 // ============================================
 
 // GET listar usuarios — admin

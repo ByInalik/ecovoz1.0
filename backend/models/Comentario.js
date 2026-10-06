@@ -9,9 +9,9 @@ const ComentarioSchema = new mongoose.Schema({
   autor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',
-    default: null  // 🔽 ahora puede ser null
+    default: null  // ahora puede ser null
   },
-  // 🔽 NUEVO: guarda el ID original al anonimizar
+  // NUEVO: guarda el ID original al anonimizar
   autorOriginal: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Usuario',

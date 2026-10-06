@@ -11,7 +11,7 @@ const { registrarManual } = require('../middleware/auditoria');
 router.use(verificarToken);
 
 // ============================================
-// 👤 GET mi perfil — el usuario ve su propia info
+// GET mi perfil — el usuario ve su propia info
 // ============================================
 router.get('/', async (req, res) => {
   try {
@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================
-// 🗑️ DELETE eliminar MI cuenta — RF-016
+// DELETE eliminar MI cuenta — RF-016
 // Requiere enviar la contraseña para confirmar
 // ============================================
 router.delete('/', async (req, res) => {

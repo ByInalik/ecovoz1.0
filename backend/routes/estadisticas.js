@@ -12,7 +12,7 @@ router.use(verificarToken);
 router.use(verificarFuncionario);
 
 // ============================================
-// 📊 ESTADÍSTICAS GENERALES (RF-008)
+// ESTADÍSTICAS GENERALES (RF-008)
 // ============================================
 
 // GET resumen general

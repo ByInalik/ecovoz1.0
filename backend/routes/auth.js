@@ -80,7 +80,7 @@ router.post('/registro-funcionario', async (req, res) => {
       rol: 'funcionario'
     });
 
-    // 🔍 Registrar la acción en auditoría
+    // Registrar la acción en auditoría
     await registrarManual({
       req,
       usuario,
@@ -130,7 +130,7 @@ router.post('/registro-admin', async (req, res) => {
       rol: 'admin'
     });
 
-    // 🔍 Registrar la acción en auditoría
+    // Registrar la acción en auditoría
     await registrarManual({
       req,
       usuario,
@@ -168,7 +168,7 @@ router.post('/login', async (req, res) => {
     // 1. Buscar el usuario por email
     const usuario = await Usuario.findOne({ email });
     if (!usuario) {
-      // 🔍 Registrar login fallido (usuario no existe)
+      // Registrar login fallido (usuario no existe)
       await registrarManual({
         req,
         usuario: null,
@@ -183,7 +183,7 @@ router.post('/login', async (req, res) => {
     // 2. Comparar la contraseña con el hash guardado
     const valida = await bcrypt.compare(password, usuario.password);
     if (!valida) {
-      // 🔍 Registrar login fallido (password incorrecta)
+      // Registrar login fallido (password incorrecta)
       await registrarManual({
         req,
         usuario,
@@ -195,7 +195,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Email o contraseña incorrectos' });
     }
 
-    // 3. 👇 Validación de cuenta ELIMINADA (RF-016)
+    // 3. Validación de cuenta ELIMINADA (RF-016)
     if (usuario.eliminado === true) {
       await registrarManual({
         req,
@@ -210,7 +210,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // 4. 👇 Validación de cuenta DESACTIVADA
+    // 4. Validación de cuenta DESACTIVADA
     if (usuario.estado === false) {
       await registrarManual({
         req,
@@ -231,7 +231,7 @@ router.post('/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    // 6. 🔍 Registrar login exitoso
+    // 6. Registrar login exitoso
     await registrarManual({
       req,
       usuario,

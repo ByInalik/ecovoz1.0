@@ -9,7 +9,7 @@ router.use(verificarToken);
 router.use(verificarAdmin);
 
 // ============================================
-// 📋 GET listar logs — admin (RF-021)
+// GET listar logs — admin (RF-021)
 // ============================================
 router.get('/', async (req, res) => {
   try {
@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================
-// 📋 GET logs de un usuario específico
+// GET logs de un usuario específico
 // ============================================
 router.get('/usuario/:id', async (req, res) => {
   try {
@@ -86,7 +86,7 @@ router.get('/usuario/:id', async (req, res) => {
 });
 
 // ============================================
-// 📊 GET resumen — admin
+// GET resumen — admin
 // ============================================
 router.get('/resumen', async (req, res) => {
   try {
@@ -113,7 +113,7 @@ router.get('/resumen', async (req, res) => {
 });
 
 // ============================================
-// 🗑️ DELETE limpiar logs antiguos (>90 días) — admin
+// DELETE limpiar logs antiguos (>90 días) — admin
 // ============================================
 router.delete('/limpiar', async (req, res) => {
   try {
