@@ -4,6 +4,7 @@ const Reporte = require('../models/Reporte');
 const EstadoReporte = require('../models/EstadoReporte');
 const Comentario = require('../models/Comentario');
 const Evidencia = require('../models/Evidencia');
+const Usuario = require('../models/Usuario');
 const verificarToken = require('../middleware/auth');
 const verificarAdmin = require('../middleware/admin');
 const verificarFuncionario = require('../middleware/funcionario');
@@ -15,6 +16,12 @@ const auditar = require('../middleware/auditoria');
 const { validarUbicacion } = require('../utils/validarUbicacion');
 const { registrarManual } = require('../middleware/auditoria');
 const { generarPDFReporte } = require('../utils/generarPDF');
+const { crearNotificacion } = require('../utils/notificaciones');        
+const {                                                                    
+  enviarEmailCambioEstado,                                                
+  enviarEmailModeracion,                                                  
+  enviarEmailNuevoComentario                                              
+} = require('../utils/emailService');
 
 // ============================================
 // RUTAS PÚBLICAS — GET
@@ -353,6 +360,32 @@ router.post('/:id/comentarios', verificarToken, async (req, res) => {
       .populate('autor', 'nombre email rol')
       .populate('respondeA', 'texto autor');
 
+    // NOTIFICAR al autor del reporte (si no es él mismo quien comenta)
+    try {
+      if (reporte.creadoPor && reporte.creadoPor.toString() !== req.usuario.id) {
+        const autorReporte = await Usuario.findById(reporte.creadoPor);
+        const autorComentario = await Usuario.findById(req.usuario.id);
+
+        if (autorReporte && autorReporte.email) {
+          await crearNotificacion({
+            usuario: autorReporte,
+            tipo: 'nuevo_comentario',
+            titulo: 'Nuevo comentario en tu reporte',
+            mensaje: `${autorComentario.nombre} comentó: "${texto.substring(0, 80)}${texto.length > 80 ? '...' : ''}"`,
+            referencia: { tipo: 'Comentario', id: nuevo._id },
+            emailFn: () => enviarEmailNuevoComentario({
+              usuario: autorReporte,
+              reporte,
+              autorComentario: autorComentario.nombre,
+              textoComentario: texto
+            })
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.error('Error notificando comentario:', notifErr.message);
+    }
+
     res.status(201).json(comentarioConDatos);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -507,6 +540,30 @@ router.put('/:id/moderar', verificarToken, verificarFuncionario, auditar('modera
       cambiadoPor: req.usuario.id
     });
 
+    // NOTIFICAR al autor de la decisión
+    try {
+      const autor = await Usuario.findById(reporte.creadoPor);
+      if (autor && autor.email) {
+        await crearNotificacion({
+          usuario: autor,
+          tipo: decision === 'aprobar' ? 'moderacion_aprobado' : 'moderacion_rechazado',
+          titulo: decision === 'aprobar' ? 'Tu reporte fue aprobado' : 'Tu reporte fue rechazado',
+          mensaje: decision === 'aprobar'
+            ? `El reporte "${reporte.titulo}" es visible al público.`
+            : `El reporte "${reporte.titulo}" fue rechazado: ${motivo.trim()}`,
+          referencia: { tipo: 'Reporte', id: reporte._id },
+          emailFn: () => enviarEmailModeracion({
+            usuario: autor,
+            reporte,
+            decision,
+            motivo: motivo ? motivo.trim() : ''
+          })
+        });
+      }
+    } catch (notifErr) {
+      console.error('Error notificando moderación:', notifErr.message);
+    }
+
     res.json({
       mensaje: decision === 'aprobar'
         ? 'Reporte aprobado y visible públicamente'
@@ -561,6 +618,29 @@ router.put('/:id/estado', verificarToken, verificarFuncionario, auditar('cambiar
 
     reporte.estado = estado;
     await reporte.save();
+
+    // 🆕 NOTIFICAR al autor del reporte
+    try {
+      const autor = await Usuario.findById(reporte.creadoPor);
+      if (autor && autor.email && autor._id.toString() !== req.usuario.id) {
+        await crearNotificacion({
+          usuario: autor,
+          tipo: 'cambio_estado',
+          titulo: `Tu reporte cambió a "${estado}"`,
+          mensaje: `El reporte "${reporte.titulo}" pasó de "${cambio.estadoAnterior}" a "${estado}".`,
+          referencia: { tipo: 'Reporte', id: reporte._id },
+          emailFn: () => enviarEmailCambioEstado({
+            usuario: autor,
+            reporte,
+            estadoAnterior: cambio.estadoAnterior,
+            estadoNuevo: estado,
+            comentario
+          })
+        });
+      }
+    } catch (notifErr) {
+      console.error('Error creando notificación:', notifErr.message);
+    }
 
     res.json({
       mensaje: 'Estado actualizado correctamente',
