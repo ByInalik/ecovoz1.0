@@ -9,6 +9,7 @@ const verificarToken = require('../middleware/auth');
 const verificarAdmin = require('../middleware/admin');
 const verificarFuncionario = require('../middleware/funcionario');
 const upload = require('../middleware/upload');
+const { comprimirImagen } = require('../middleware/upload');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -22,6 +23,7 @@ const {
   enviarEmailModeracion,                                                  
   enviarEmailNuevoComentario                                              
 } = require('../utils/emailService');
+
 
 // ============================================
 // RUTAS PÚBLICAS — GET
@@ -393,7 +395,7 @@ router.post('/:id/comentarios', verificarToken, async (req, res) => {
 });
 
 // POST subir evidencia (RF-010)
-router.post('/:id/evidencias', verificarToken, upload.single('archivo'), async (req, res) => {
+router.post('/:id/evidencias', verificarToken, upload.single('archivo'), comprimirImagen, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No se subió ningún archivo' });
