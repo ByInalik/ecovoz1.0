@@ -12,6 +12,35 @@ const { enviarEmailResetPassword } = require('../utils/emailService');
 // ============================================
 // POST /api/auth/registro — crear cuenta nueva
 // ============================================
+/**
+ * @swagger
+ * /api/auth/registro:
+ *   post:
+ *     summary: Registrar nuevo ciudadano
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nombre, email, password]
+ *             properties:
+ *               nombre:
+ *                 type: string
+ *                 example: Michael Hernández
+ *               email:
+ *                 type: string
+ *                 example: michael@ecovoz.com
+ *               password:
+ *                 type: string
+ *                 example: mipassword123
+ *     responses:
+ *       201:
+ *         description: Usuario creado
+ *       400:
+ *         description: Email ya registrado o datos inválidos
+ */
 router.post('/registro', async (req, res) => {
   try {
     const { nombre, email, password, rol } = req.body;
@@ -59,6 +88,38 @@ router.post('/registro', async (req, res) => {
 // ============================================
 // POST /api/auth/registro-funcionario — solo con secret
 // ============================================
+/**
+ * @swagger
+ * /api/auth/registro-funcionario:
+ *   post:
+ *     summary: Registrar nuevo funcionario (requiere secret)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nombre, email, password, funcionarioSecret]
+ *             properties:
+ *               nombre:
+ *                 type: string
+ *                 example: Funcionario CAM
+ *               email:
+ *                 type: string
+ *                 example: funcionario@ecovoz.com
+ *               password:
+ *                 type: string
+ *                 example: funcionario123
+ *               funcionarioSecret:
+ *                 type: string
+ *                 example: tu_secreto_de_funcionario
+ *     responses:
+ *       201:
+ *         description: Funcionario creado
+ *       403:
+ *         description: Código de funcionario inválido
+ */
 router.post('/registro-funcionario', async (req, res) => {
   try {
     const { nombre, email, password, funcionarioSecret } = req.body;
@@ -109,6 +170,38 @@ router.post('/registro-funcionario', async (req, res) => {
 // ============================================
 // POST /api/auth/registro-admin — solo con secret
 // ============================================
+/**
+ * @swagger
+ * /api/auth/registro-admin:
+ *   post:
+ *     summary: Registrar nuevo admin (requiere secret)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nombre, email, password, adminSecret]
+ *             properties:
+ *               nombre:
+ *                 type: string
+ *                 example: Admin EcoVoz
+ *               email:
+ *                 type: string
+ *                 example: admin@ecovoz.com
+ *               password:
+ *                 type: string
+ *                 example: admin123
+ *               adminSecret:
+ *                 type: string
+ *                 example: tu_secreto_de_admin
+ *     responses:
+ *       201:
+ *         description: Admin creado
+ *       403:
+ *         description: Código de admin inválido
+ */
 router.post('/registro-admin', async (req, res) => {
   try {
     const { nombre, email, password, adminSecret } = req.body;
@@ -159,6 +252,45 @@ router.post('/registro-admin', async (req, res) => {
 // ============================================
 // POST /api/auth/login — iniciar sesión y recibir token
 // ============================================
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Iniciar sesión
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: michael@ecovoz.com
+ *               password:
+ *                 type: string
+ *                 example: mipassword123
+ *     responses:
+ *       200:
+ *         description: Login exitoso, devuelve token JWT
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 nombre:
+ *                   type: string
+ *                 rol:
+ *                   type: string
+ *       401:
+ *         description: Credenciales inválidas
+ *       403:
+ *         description: Cuenta desactivada o eliminada
+ */
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -258,6 +390,27 @@ router.post('/login', async (req, res) => {
 
 // POST /api/auth/olvide-password
 // Solicita el enlace de recuperación
+/**
+ * @swagger
+ * /api/auth/olvide-password:
+ *   post:
+ *     summary: Solicitar restablecimiento de contraseña
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: michael@ecovoz.com
+ *     responses:
+ *       200:
+ *         description: Email enviado (si existe en el sistema)
+ */
 router.post('/olvide-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -314,6 +467,39 @@ router.post('/olvide-password', async (req, res) => {
 
 // POST /api/auth/reset-password/:token
 // Cambia la contraseña con el token
+/**
+ * @swagger
+ * /api/auth/reset-password/{token}:
+ *   post:
+ *     summary: Restablecer contraseña con token
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Token recibido por email
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password, passwordConfirm]
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 example: nuevapassword123
+ *               passwordConfirm:
+ *                 type: string
+ *                 example: nuevapassword123
+ *     responses:
+ *       200:
+ *         description: Contraseña actualizada
+ *       400:
+ *         description: Token inválido o expirado
+ */
 router.post('/reset-password/:token', async (req, res) => {
   try {
     const { token } = req.params;

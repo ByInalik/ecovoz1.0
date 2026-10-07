@@ -2,36 +2,41 @@ const express = require('express');
 const router = express.Router();
 const Reporte = require('../models/Reporte');
 const Usuario = require('../models/Usuario');
-const Comentario = require('../models/Comentario');
-const Evidencia = require('../models/Evidencia');
 const verificarToken = require('../middleware/auth');
 const verificarFuncionario = require('../middleware/funcionario');
 
-// Todas las estadísticas requieren token de funcionario o admin
-router.use(verificarToken);
-router.use(verificarFuncionario);
+// Todas las rutas de estadísticas requieren ser funcionario o admin
+router.use(verificarToken, verificarFuncionario);
 
 // ============================================
-// ESTADÍSTICAS GENERALES (RF-008)
+// 📊 GET resumen general — RF-008
 // ============================================
-
-// GET resumen general
+/**
+ * @swagger
+ * /api/estadisticas/resumen:
+ *   get:
+ *     summary: Resumen general de reportes y usuarios
+ *     tags: [Estadísticas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Totales generales y por estado
+ */
 router.get('/resumen', async (req, res) => {
   try {
     const [
       totalReportes,
       totalUsuarios,
-      totalComentarios,
-      totalEvidencias,
-      reportesPendientes,
-      reportesEnProceso,
-      reportesSolucionados
+      pendientes,
+      enRevision,
+      enProceso,
+      solucionados
     ] = await Promise.all([
       Reporte.countDocuments(),
       Usuario.countDocuments(),
-      Comentario.countDocuments(),
-      Evidencia.countDocuments(),
       Reporte.countDocuments({ estado: 'Pendiente' }),
+      Reporte.countDocuments({ estado: 'En revisión' }),
       Reporte.countDocuments({ estado: 'En proceso' }),
       Reporte.countDocuments({ estado: 'Solucionado' })
     ]);
@@ -39,12 +44,11 @@ router.get('/resumen', async (req, res) => {
     res.json({
       totalReportes,
       totalUsuarios,
-      totalComentarios,
-      totalEvidencias,
-      reportesPorEstado: {
-        pendientes: reportesPendientes,
-        enProceso: reportesEnProceso,
-        solucionados: reportesSolucionados
+      porEstado: {
+        pendientes,
+        enRevision,
+        enProceso,
+        solucionados
       }
     });
   } catch (err) {
@@ -52,90 +56,100 @@ router.get('/resumen', async (req, res) => {
   }
 });
 
-// GET reportes por categoría
+// ============================================
+// 📊 GET reportes por categoría
+// ============================================
+/**
+ * @swagger
+ * /api/estadisticas/por-categoria:
+ *   get:
+ *     summary: Reportes agrupados por categoría
+ *     tags: [Estadísticas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Array de categorías con conteo
+ */
 router.get('/por-categoria', async (req, res) => {
   try {
     const resultado = await Reporte.aggregate([
-      {
-        $group: {
-          _id: '$categoria',
-          cantidad: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { cantidad: -1 }
-      },
-      {
-        $project: {
-          _id: 0,
-          categoria: '$_id',
-          cantidad: 1
-        }
-      }
+      { $group: { _id: '$categoria', total: { $sum: 1 } } },
+      { $sort: { total: -1 } },
+      { $project: { _id: 0, categoria: '$_id', total: 1 } }
     ]);
-
     res.json(resultado);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET reportes por estado
+// ============================================
+// 📊 GET reportes por estado
+// ============================================
+/**
+ * @swagger
+ * /api/estadisticas/por-estado:
+ *   get:
+ *     summary: Reportes agrupados por estado
+ *     tags: [Estadísticas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Array de estados con conteo
+ */
 router.get('/por-estado', async (req, res) => {
   try {
     const resultado = await Reporte.aggregate([
-      {
-        $group: {
-          _id: '$estado',
-          cantidad: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { cantidad: -1 }
-      },
-      {
-        $project: {
-          _id: 0,
-          estado: '$_id',
-          cantidad: 1
-        }
-      }
+      { $group: { _id: '$estado', total: { $sum: 1 } } },
+      { $sort: { total: -1 } },
+      { $project: { _id: 0, estado: '$_id', total: 1 } }
     ]);
-
     res.json(resultado);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET reportes por mes (últimos 12 meses)
+// ============================================
+// 📊 GET reportes por mes (últimos 12 meses)
+// ============================================
+/**
+ * @swagger
+ * /api/estadisticas/por-mes:
+ *   get:
+ *     summary: Reportes agrupados por mes (últimos 12 meses)
+ *     tags: [Estadísticas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Array de meses con conteo
+ */
 router.get('/por-mes', async (req, res) => {
   try {
-    const haceUnAno = new Date();
-    haceUnAno.setMonth(haceUnAno.getMonth() - 12);
+    const hace12Meses = new Date();
+    hace12Meses.setMonth(hace12Meses.getMonth() - 12);
 
     const resultado = await Reporte.aggregate([
-      {
-        $match: { createdAt: { $gte: haceUnAno } }
-      },
+      { $match: { createdAt: { $gte: hace12Meses } } },
       {
         $group: {
           _id: {
-            anio: { $year: '$createdAt' },
+            año: { $year: '$createdAt' },
             mes: { $month: '$createdAt' }
           },
-          cantidad: { $sum: 1 }
+          total: { $sum: 1 }
         }
       },
-      {
-        $sort: { '_id.anio': 1, '_id.mes': 1 }
-      },
+      { $sort: { '_id.año': 1, '_id.mes': 1 } },
       {
         $project: {
           _id: 0,
-          anio: '$_id.anio',
+          año: '$_id.año',
           mes: '$_id.mes',
-          cantidad: 1
+          total: 1
         }
       }
     ]);
@@ -146,31 +160,29 @@ router.get('/por-mes', async (req, res) => {
   }
 });
 
-// GET zonas más afectadas (basado en ubicación de texto)
-router.get('/zonas', async (req, res) => {
+// ============================================
+// 📊 GET reportes por zona (top 10)
+// ============================================
+/**
+ * @swagger
+ * /api/estadisticas/por-zona:
+ *   get:
+ *     summary: Top 10 zonas con más reportes
+ *     tags: [Estadísticas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Array de zonas con conteo
+ */
+router.get('/por-zona', async (req, res) => {
   try {
     const resultado = await Reporte.aggregate([
-      {
-        $group: {
-          _id: '$ubicacion',
-          cantidad: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { cantidad: -1 }
-      },
-      {
-        $limit: 10
-      },
-      {
-        $project: {
-          _id: 0,
-          ubicacion: '$_id',
-          cantidad: 1
-        }
-      }
+      { $group: { _id: '$ubicacion', total: { $sum: 1 } } },
+      { $sort: { total: -1 } },
+      { $limit: 10 },
+      { $project: { _id: 0, zona: '$_id', total: 1 } }
     ]);
-
     res.json(resultado);
   } catch (err) {
     res.status(500).json({ error: err.message });

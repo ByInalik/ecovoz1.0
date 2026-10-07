@@ -12,10 +12,45 @@ router.use(verificarToken);
 router.use(verificarAdmin);
 
 // ============================================
-// GESTIÓN DE USUARIOS (RF-020)
+// 👥 GESTIÓN DE USUARIOS (RF-020)
 // ============================================
 
 // GET listar usuarios — admin
+/**
+ * @swagger
+ * /api/usuarios:
+ *   get:
+ *     summary: Listar usuarios (solo admin)
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: rol
+ *         schema:
+ *           type: string
+ *           enum: [ciudadano, funcionario, admin]
+ *       - in: query
+ *         name: buscar
+ *         schema:
+ *           type: string
+ *         example: michael
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Lista de usuarios
+ *       403:
+ *         description: Solo admin
+ */
 router.get('/', async (req, res) => {
   try {
     const { rol, buscar, page = 1, limit = 20 } = req.query;
@@ -35,7 +70,7 @@ router.get('/', async (req, res) => {
 
     const [usuarios, total] = await Promise.all([
       Usuario.find(filtro)
-        .select('-password') // NUNCA devolver el password
+        .select('-password')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum),
@@ -55,12 +90,31 @@ router.get('/', async (req, res) => {
 });
 
 // GET usuario por ID — admin
+/**
+ * @swagger
+ * /api/usuarios/{id}:
+ *   get:
+ *     summary: Ver usuario por ID (solo admin)
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Detalle del usuario con estadísticas
+ *       404:
+ *         description: Usuario no encontrado
+ */
 router.get('/:id', async (req, res) => {
   try {
     const usuario = await Usuario.findById(req.params.id).select('-password');
     if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    // Contar reportes creados por este usuario
     const totalReportes = await Reporte.countDocuments({ creadoPor: usuario._id });
     const totalComentarios = await Comentario.countDocuments({ autor: usuario._id });
 
@@ -80,6 +134,37 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT cambiar rol — admin
+/**
+ * @swagger
+ * /api/usuarios/{id}/rol:
+ *   put:
+ *     summary: Cambiar rol de un usuario (solo admin)
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [rol]
+ *             properties:
+ *               rol:
+ *                 type: string
+ *                 enum: [ciudadano, funcionario, admin]
+ *     responses:
+ *       200:
+ *         description: Rol actualizado
+ *       400:
+ *         description: No puedes cambiar tu propio rol
+ */
 router.put('/:id/rol', auditar('cambiar_rol', 'Usuario'), async (req, res) => {
   try {
     const { rol } = req.body;
@@ -95,7 +180,6 @@ router.put('/:id/rol', auditar('cambiar_rol', 'Usuario'), async (req, res) => {
       });
     }
 
-    // Evitar que un admin se quite a sí mismo el rol
     if (req.params.id === req.usuario.id) {
       return res.status(400).json({
         error: 'No puedes cambiar tu propio rol'
@@ -123,6 +207,37 @@ router.put('/:id/rol', auditar('cambiar_rol', 'Usuario'), async (req, res) => {
 });
 
 // PUT activar/desactivar usuario — admin
+/**
+ * @swagger
+ * /api/usuarios/{id}/estado:
+ *   put:
+ *     summary: Activar o desactivar un usuario (solo admin)
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [activo]
+ *             properties:
+ *               activo:
+ *                 type: boolean
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Usuario activado/desactivado
+ *       400:
+ *         description: No puedes desactivar tu propia cuenta
+ */
 router.put('/:id/estado', auditar('cambiar_estado_usuario', 'Usuario'), async (req, res) => {
   try {
     const { activo } = req.body;
@@ -131,7 +246,6 @@ router.put('/:id/estado', auditar('cambiar_estado_usuario', 'Usuario'), async (r
       return res.status(400).json({ error: 'El campo "activo" debe ser true o false' });
     }
 
-    // Evitar que un admin se desactive a sí mismo
     if (req.params.id === req.usuario.id) {
       return res.status(400).json({
         error: 'No puedes desactivar tu propia cuenta'
@@ -159,9 +273,28 @@ router.put('/:id/estado', auditar('cambiar_estado_usuario', 'Usuario'), async (r
 });
 
 // DELETE eliminar usuario — admin
+/**
+ * @swagger
+ * /api/usuarios/{id}:
+ *   delete:
+ *     summary: Eliminar usuario (solo admin)
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Usuario eliminado
+ *       400:
+ *         description: No puedes eliminar tu propia cuenta
+ */
 router.delete('/:id', auditar('eliminar_usuario', 'Usuario'), async (req, res) => {
   try {
-    // Evitar que un admin se elimine a sí mismo
     if (req.params.id === req.usuario.id) {
       return res.status(400).json({
         error: 'No puedes eliminar tu propia cuenta'

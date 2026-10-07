@@ -9,8 +9,65 @@ router.use(verificarToken);
 router.use(verificarAdmin);
 
 // ============================================
-// GET listar logs — admin (RF-021)
+// 📋 GET listar logs — admin (RF-021)
 // ============================================
+/**
+ * @swagger
+ * /api/auditoria:
+ *   get:
+ *     summary: Listar logs de auditoría (solo admin)
+ *     tags: [Auditoría]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: usuario
+ *         schema:
+ *           type: string
+ *         description: Filtrar por ID de usuario
+ *       - in: query
+ *         name: accion
+ *         schema:
+ *           type: string
+ *         example: login_exitoso
+ *       - in: query
+ *         name: entidad
+ *         schema:
+ *           type: string
+ *         example: Reporte
+ *       - in: query
+ *         name: exito
+ *         schema:
+ *           type: boolean
+ *         description: Filtrar por resultado (true=exitoso, false=fallido)
+ *       - in: query
+ *         name: desde
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2026-01-01"
+ *       - in: query
+ *         name: hasta
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2026-12-31"
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *     responses:
+ *       200:
+ *         description: Lista de logs con paginación
+ *       403:
+ *         description: Solo admin
+ */
 router.get('/', async (req, res) => {
   try {
     const {
@@ -67,8 +124,29 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================
-// GET logs de un usuario específico
+// 📋 GET logs de un usuario específico
 // ============================================
+/**
+ * @swagger
+ * /api/auditoria/usuario/{id}:
+ *   get:
+ *     summary: Ver últimos 100 logs de un usuario (solo admin)
+ *     tags: [Auditoría]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del usuario
+ *     responses:
+ *       200:
+ *         description: Logs del usuario
+ *       404:
+ *         description: Usuario no encontrado
+ */
 router.get('/usuario/:id', async (req, res) => {
   try {
     const logs = await LogActividad.find({ usuario: req.params.id })
@@ -86,8 +164,35 @@ router.get('/usuario/:id', async (req, res) => {
 });
 
 // ============================================
-// GET resumen — admin
+// 📊 GET resumen — admin
 // ============================================
+/**
+ * @swagger
+ * /api/auditoria/resumen:
+ *   get:
+ *     summary: Resumen de actividad (top 10 acciones + por resultado)
+ *     tags: [Auditoría]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Resumen con agregaciones
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 porAccion:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 porExito:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ */
 router.get('/resumen', async (req, res) => {
   try {
     const [porAccion, porExito, total] = await Promise.all([
@@ -113,8 +218,29 @@ router.get('/resumen', async (req, res) => {
 });
 
 // ============================================
-// DELETE limpiar logs antiguos (>90 días) — admin
+// 🗑️ DELETE limpiar logs antiguos (>90 días) — admin
 // ============================================
+/**
+ * @swagger
+ * /api/auditoria/limpiar:
+ *   delete:
+ *     summary: Eliminar logs con más de 90 días (solo admin)
+ *     tags: [Auditoría]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logs eliminados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 mensaje:
+ *                   type: string
+ *                 eliminados:
+ *                   type: integer
+ */
 router.delete('/limpiar', async (req, res) => {
   try {
     const hace90Dias = new Date();

@@ -17,19 +17,87 @@ const auditar = require('../middleware/auditoria');
 const { validarUbicacion } = require('../utils/validarUbicacion');
 const { registrarManual } = require('../middleware/auditoria');
 const { generarPDFReporte } = require('../utils/generarPDF');
-const { crearNotificacion } = require('../utils/notificaciones');        
-const {                                                                    
-  enviarEmailCambioEstado,                                                
-  enviarEmailModeracion,                                                  
-  enviarEmailNuevoComentario                                              
+const { crearNotificacion } = require('../utils/notificaciones');
+const {
+  enviarEmailCambioEstado,
+  enviarEmailModeracion,
+  enviarEmailNuevoComentario
 } = require('../utils/emailService');
 
-
 // ============================================
-// RUTAS PÚBLICAS — GET
+// 🌐 RUTAS PÚBLICAS — GET
 // ============================================
 
 // GET todos los reportes — público, con filtros avanzados (RF-018 + RF-019)
+/**
+ * @swagger
+ * /api/reportes:
+ *   get:
+ *     summary: Listar reportes con filtros y paginación
+ *     tags: [Reportes]
+ *     parameters:
+ *       - in: query
+ *         name: categoria
+ *         schema:
+ *           type: string
+ *         example: Residuos
+ *       - in: query
+ *         name: estado
+ *         schema:
+ *           type: string
+ *         example: Pendiente
+ *       - in: query
+ *         name: desde
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2026-01-01"
+ *       - in: query
+ *         name: hasta
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2026-12-31"
+ *       - in: query
+ *         name: buscar
+ *         schema:
+ *           type: string
+ *         example: basura
+ *       - in: query
+ *         name: creadoPor
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: incluirNoAprobados
+ *         schema:
+ *           type: boolean
+ *         description: Si es true, incluye pendientes y rechazados (solo staff)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: orden
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, updatedAt, titulo, estado]
+ *           default: createdAt
+ *       - in: query
+ *         name: dir
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *     responses:
+ *       200:
+ *         description: Lista de reportes con metadata de paginación
+ */
 router.get('/', async (req, res) => {
   try {
     const {
@@ -107,10 +175,26 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================
-// RUTAS ESPECÍFICAS (deben ir ANTES que /:id)
+// 🔍 RUTAS ESPECÍFICAS (deben ir ANTES que /:id)
 // ============================================
 
 // GET historial de cambios — público (RF-006)
+/**
+ * @swagger
+ * /api/reportes/{id}/historial:
+ *   get:
+ *     summary: Ver historial de cambios de estado
+ *     tags: [Reportes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Historial de cambios
+ */
 router.get('/:id/historial', async (req, res) => {
   try {
     const historial = await EstadoReporte.find({ reporte: req.params.id })
@@ -126,6 +210,24 @@ router.get('/:id/historial', async (req, res) => {
 });
 
 // GET comentarios — requiere token (filtra internos) (RF-022)
+/**
+ * @swagger
+ * /api/reportes/{id}/comentarios:
+ *   get:
+ *     summary: Ver comentarios de un reporte
+ *     tags: [Comentarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Lista de comentarios (filtra internos según rol)
+ */
 router.get('/:id/comentarios', verificarToken, async (req, res) => {
   try {
     const filtro = { reporte: req.params.id };
@@ -149,6 +251,22 @@ router.get('/:id/comentarios', verificarToken, async (req, res) => {
 });
 
 // GET evidencias — público (RF-010)
+/**
+ * @swagger
+ * /api/reportes/{id}/evidencias:
+ *   get:
+ *     summary: Listar evidencias de un reporte
+ *     tags: [Evidencias]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Lista de evidencias
+ */
 router.get('/:id/evidencias', async (req, res) => {
   try {
     const evidencias = await Evidencia.find({ reporte: req.params.id })
@@ -164,9 +282,34 @@ router.get('/:id/evidencias', async (req, res) => {
 });
 
 // ============================================
-// EXPORTAR A PDF — RF-017
+// 📄 EXPORTAR A PDF — RF-017
 // (Debe ir ANTES de GET /:id)
 // ============================================
+/**
+ * @swagger
+ * /api/reportes/{id}/pdf:
+ *   get:
+ *     summary: Exportar reporte a PDF
+ *     tags: [Reportes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: PDF del reporte (descarga)
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       403:
+ *         description: No autorizado
+ */
 router.get('/:id/pdf', verificarToken, async (req, res) => {
   try {
     const reporte = await Reporte.findById(req.params.id)
@@ -225,10 +368,28 @@ router.get('/:id/pdf', verificarToken, async (req, res) => {
 });
 
 // ============================================
-// RUTA GENÉRICA POR ID (al final de los GET)
+// 🌐 RUTA GENÉRICA POR ID (al final de los GET)
 // ============================================
 
 // GET por ID — público pero filtra por moderación (RF-019)
+/**
+ * @swagger
+ * /api/reportes/{id}:
+ *   get:
+ *     summary: Ver un reporte por ID
+ *     tags: [Reportes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Detalle del reporte
+ *       404:
+ *         description: No encontrado (o sin permisos si no está aprobado)
+ */
 router.get('/:id', async (req, res) => {
   try {
     const item = await Reporte.findById(req.params.id)
@@ -270,10 +431,56 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================
-// RUTAS PROTEGIDAS — POST
+// 🔒 RUTAS PROTEGIDAS — POST
 // ============================================
 
 // POST crear reporte (RF-003 + RF-025 + RF-019)
+/**
+ * @swagger
+ * /api/reportes:
+ *   post:
+ *     summary: Crear un nuevo reporte
+ *     tags: [Reportes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [titulo, descripcion, categoria, ubicacion, latitud, longitud]
+ *             properties:
+ *               titulo:
+ *                 type: string
+ *                 example: Basura en el parque
+ *               descripcion:
+ *                 type: string
+ *                 example: Residuos acumulados en la esquina
+ *               categoria:
+ *                 type: string
+ *                 enum: [Residuos, Agua, Aire, Fauna, Flora, Ruido, Otro]
+ *               subcategoria:
+ *                 type: string
+ *                 example: Basura acumulada
+ *               ubicacion:
+ *                 type: string
+ *                 example: Parque Central, Garzón
+ *               latitud:
+ *                 type: number
+ *                 example: 2.1969
+ *               longitud:
+ *                 type: number
+ *                 example: -75.6269
+ *               solicitarExcepcion:
+ *                 type: boolean
+ *                 description: Si está fuera de Garzón y quieres solicitar excepción
+ *     responses:
+ *       201:
+ *         description: Reporte creado (queda en "Pendiente de moderación")
+ *       400:
+ *         description: Datos inválidos o ubicación fuera de Garzón
+ */
 router.post('/', verificarToken, auditar('crear_reporte', 'Reporte'), async (req, res) => {
   try {
     const {
@@ -329,6 +536,42 @@ router.post('/', verificarToken, auditar('crear_reporte', 'Reporte'), async (req
 });
 
 // POST crear comentario (RF-022)
+/**
+ * @swagger
+ * /api/reportes/{id}/comentarios:
+ *   post:
+ *     summary: Crear un comentario en un reporte
+ *     tags: [Comentarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [texto]
+ *             properties:
+ *               texto:
+ *                 type: string
+ *                 example: Ya estamos trabajando en esto
+ *               tipo:
+ *                 type: string
+ *                 enum: [publico, interno]
+ *                 default: publico
+ *               respondeA:
+ *                 type: string
+ *                 description: ID del comentario al que responde (opcional)
+ *     responses:
+ *       201:
+ *         description: Comentario creado
+ */
 router.post('/:id/comentarios', verificarToken, async (req, res) => {
   try {
     const { texto, tipo, respondeA } = req.body;
@@ -362,7 +605,7 @@ router.post('/:id/comentarios', verificarToken, async (req, res) => {
       .populate('autor', 'nombre email rol')
       .populate('respondeA', 'texto autor');
 
-    // NOTIFICAR al autor del reporte (si no es él mismo quien comenta)
+    // Notificar al autor del reporte (si no es él mismo quien comenta)
     try {
       if (reporte.creadoPor && reporte.creadoPor.toString() !== req.usuario.id) {
         const autorReporte = await Usuario.findById(reporte.creadoPor);
@@ -394,7 +637,39 @@ router.post('/:id/comentarios', verificarToken, async (req, res) => {
   }
 });
 
-// POST subir evidencia (RF-010)
+// POST subir evidencia (RF-010 + RF-013)
+/**
+ * @swagger
+ * /api/reportes/{id}/evidencias:
+ *   post:
+ *     summary: Subir evidencia (foto o video)
+ *     tags: [Evidencias]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [archivo]
+ *             properties:
+ *               archivo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Imagen (JPG/PNG máx 10MB) o video (MP4 máx 50MB)
+ *     responses:
+ *       201:
+ *         description: Evidencia subida (imágenes >2MB se comprimen automáticamente)
+ *       400:
+ *         description: Archivo inválido o límite alcanzado
+ */
 router.post('/:id/evidencias', verificarToken, upload.single('archivo'), comprimirImagen, async (req, res) => {
   try {
     if (!req.file) {
@@ -479,10 +754,45 @@ router.post('/:id/evidencias', verificarToken, upload.single('archivo'), comprim
 });
 
 // ============================================
-// RUTAS PROTEGIDAS — PUT
+// 🔒 RUTAS PROTEGIDAS — PUT
 // ============================================
 
 // PUT moderar reporte — funcionario o admin (RF-019)
+/**
+ * @swagger
+ * /api/reportes/{id}/moderar:
+ *   put:
+ *     summary: Aprobar o rechazar un reporte (funcionario/admin)
+ *     tags: [Reportes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [decision]
+ *             properties:
+ *               decision:
+ *                 type: string
+ *                 enum: [aprobar, rechazar]
+ *               motivo:
+ *                 type: string
+ *                 description: Obligatorio si decision=rechazar (mín 50 caracteres)
+ *                 example: La imagen no corresponde al incidente reportado, se requiere más información detallada.
+ *     responses:
+ *       200:
+ *         description: Reporte moderado
+ *       400:
+ *         description: Decisión inválida o motivo faltante
+ */
 router.put('/:id/moderar', verificarToken, verificarFuncionario, auditar('moderar_reporte', 'Reporte'), async (req, res) => {
   try {
     const { decision, motivo } = req.body;
@@ -542,7 +852,7 @@ router.put('/:id/moderar', verificarToken, verificarFuncionario, auditar('modera
       cambiadoPor: req.usuario.id
     });
 
-    // NOTIFICAR al autor de la decisión
+    // Notificar al autor de la decisión
     try {
       const autor = await Usuario.findById(reporte.creadoPor);
       if (autor && autor.email) {
@@ -581,6 +891,38 @@ router.put('/:id/moderar', verificarToken, verificarFuncionario, auditar('modera
 });
 
 // PUT cambiar estado — funcionario o admin (RF-006)
+/**
+ * @swagger
+ * /api/reportes/{id}/estado:
+ *   put:
+ *     summary: Cambiar estado de un reporte (funcionario/admin)
+ *     tags: [Reportes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [estado]
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 enum: [Pendiente, En revisión, En proceso, Solucionado, Rechazado]
+ *               comentario:
+ *                 type: string
+ *                 example: Asignado al equipo de limpieza
+ *     responses:
+ *       200:
+ *         description: Estado actualizado (envía email al autor)
+ */
 router.put('/:id/estado', verificarToken, verificarFuncionario, auditar('cambiar_estado', 'Reporte'), async (req, res) => {
   try {
     const { estado, comentario } = req.body;
@@ -621,7 +963,7 @@ router.put('/:id/estado', verificarToken, verificarFuncionario, auditar('cambiar
     reporte.estado = estado;
     await reporte.save();
 
-    // 🆕 NOTIFICAR al autor del reporte
+    // Notificar al autor del reporte
     try {
       const autor = await Usuario.findById(reporte.creadoPor);
       if (autor && autor.email && autor._id.toString() !== req.usuario.id) {
@@ -658,6 +1000,29 @@ router.put('/:id/estado', verificarToken, verificarFuncionario, auditar('cambiar
 });
 
 // PUT actualizar todo — solo admin
+/**
+ * @swagger
+ * /api/reportes/{id}:
+ *   put:
+ *     summary: Actualizar cualquier campo de un reporte (solo admin)
+ *     tags: [Reportes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Reporte actualizado
+ */
 router.put('/:id', verificarToken, verificarAdmin, auditar('actualizar_reporte', 'Reporte'), async (req, res) => {
   try {
     const actualizado = await Reporte.findByIdAndUpdate(
@@ -673,10 +1038,35 @@ router.put('/:id', verificarToken, verificarAdmin, auditar('actualizar_reporte',
 });
 
 // ============================================
-// RUTAS PROTEGIDAS — DELETE
+// 🔒 RUTAS PROTEGIDAS — DELETE
 // ============================================
 
 // DELETE eliminar comentario — autor o admin (RF-022)
+/**
+ * @swagger
+ * /api/reportes/{idReporte}/comentarios/{idComentario}:
+ *   delete:
+ *     summary: Eliminar comentario (autor o admin)
+ *     tags: [Comentarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idReporte
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: idComentario
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Comentario eliminado
+ *       403:
+ *         description: No autorizado
+ */
 router.delete('/:idReporte/comentarios/:idComentario', verificarToken, async (req, res) => {
   try {
     const comentario = await Comentario.findById(req.params.idComentario);
@@ -700,6 +1090,29 @@ router.delete('/:idReporte/comentarios/:idComentario', verificarToken, async (re
 });
 
 // DELETE eliminar evidencia — autor o admin (RF-010)
+/**
+ * @swagger
+ * /api/reportes/{idReporte}/evidencias/{idEvidencia}:
+ *   delete:
+ *     summary: Eliminar evidencia (autor o admin)
+ *     tags: [Evidencias]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idReporte
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: idEvidencia
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Evidencia eliminada
+ */
 router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, async (req, res) => {
   try {
     const evidencia = await Evidencia.findById(req.params.idEvidencia);
@@ -732,6 +1145,24 @@ router.delete('/:idReporte/evidencias/:idEvidencia', verificarToken, async (req,
 });
 
 // DELETE eliminar reporte — solo admin (cascada)
+/**
+ * @swagger
+ * /api/reportes/{id}:
+ *   delete:
+ *     summary: Eliminar reporte (solo admin)
+ *     tags: [Reportes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Reporte eliminado en cascada (historial, comentarios, evidencias)
+ */
 router.delete('/:id', verificarToken, verificarAdmin, auditar('eliminar_reporte', 'Reporte'), async (req, res) => {
   try {
     const eliminado = await Reporte.findByIdAndDelete(req.params.id);
