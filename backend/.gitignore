@@ -9,6 +9,7 @@ yarn.lock
 # Entorno
 .env
 *.env
+.env.example
 
 # Logs
 npm-debug.log*
