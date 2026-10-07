@@ -321,14 +321,83 @@ async function enviarEmailNuevoComentario({ usuario, reporte, autorComentario, t
   });
 }
 
+// ============================================
+// Template: Restablecer contraseña (RF-015)
+// ============================================
+function templateResetPassword({ nombreUsuario, enlaceReset }) {
+  const contenido = `
+    <h2 style="color: #0f172a; margin: 0 0 20px 0; font-size: 20px;">
+      Hola ${nombreUsuario} 👋
+    </h2>
+    <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+      Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>EcoVoz</strong>.
+    </p>
+    <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 25px 0;">
+      Si fuiste tú, haz clic en el siguiente botón para crear una nueva contraseña:
+    </p>
+
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 25px;">
+      <tr>
+        <td align="center">
+          <a href="${enlaceReset}" style="display: inline-block; background-color: #16a34a; color: #ffffff; text-decoration: none; padding: 14px 40px; border-radius: 8px; font-weight: bold; font-size: 15px;">
+            Restablecer contraseña
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+      <p style="color: #92400e; font-size: 13px; margin: 0;">
+        ⏱️ <strong>Este enlace expira en 1 hora.</strong>
+      </p>
+    </div>
+
+    <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0 0 10px 0;">
+      Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseña no cambiará.
+    </p>
+
+    <p style="color: #94a3b8; font-size: 11px; margin: 20px 0 0 0; word-break: break-all;">
+      Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
+      <span style="color: #16a34a;">${enlaceReset}</span>
+    </p>
+  `;
+
+  return templateBase({
+    titulo: 'Restablecer contraseña - EcoVoz',
+    contenido
+  });
+}
+
+// ============================================
+// Función: Enviar email de reset password
+// ============================================
+async function enviarEmailResetPassword({ usuario, token }) {
+  // URL base del frontend (o backend para tests)
+  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const enlaceReset = `${baseUrl}/reset-password?token=${token}`;
+
+  const html = templateResetPassword({
+    nombreUsuario: usuario.nombre,
+    enlaceReset
+  });
+
+  return enviarEmail({
+    to: usuario.email,
+    subject: '🔑 Restablecer tu contraseña - EcoVoz',
+    html
+  });
+}
+
 module.exports = {
   enviarEmail,
   enviarEmailCambioEstado,
   enviarEmailModeracion,
   enviarEmailNuevoComentario,
+  enviarEmailResetPassword,       
   templates: {
     templateCambioEstado,
     templateModeracion,
-    templateNuevoComentario
+    templateNuevoComentario,
+    templateResetPassword
   }
 };

@@ -13,14 +13,23 @@ const usuarioSchema = new mongoose.Schema({
   },
   estado: {
     type: Boolean,
-    default: true  // true = activo, false = inactivo
+    default: true
   },
-  // NUEVOS CAMPOS para soft delete (RF-016)
+  // Soft delete (RF-016)
   eliminado: {
     type: Boolean,
     default: false
   },
   eliminadoEn: {
+    type: Date,
+    default: null
+  },
+  // Recuperación de contraseña (RF-015)
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpira: {
     type: Date,
     default: null
   }

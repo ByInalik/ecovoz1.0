@@ -6,6 +6,8 @@ const jwt     = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
 const router  = express.Router();
 const { registrarManual } = require('../middleware/auditoria');
+const crypto = require('crypto');
+const { enviarEmailResetPassword } = require('../utils/emailService');
 
 // ============================================
 // POST /api/auth/registro — crear cuenta nueva
@@ -33,7 +35,7 @@ router.post('/registro', async (req, res) => {
       rol: rolAsignado
     });
 
-    // 🔍 Registrar la acción en auditoría
+    // Registrar la acción en auditoría
     await registrarManual({
       req,
       usuario,
@@ -244,6 +246,124 @@ router.post('/login', async (req, res) => {
       token,
       nombre: usuario.nombre,
       rol: usuario.rol
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// RF-015: Restablecer contraseña
+// ============================================
+
+// POST /api/auth/olvide-password
+// Solicita el enlace de recuperación
+router.post('/olvide-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'El email es obligatorio' });
+    }
+
+    const usuario = await Usuario.findOne({ email });
+
+    // SEGURIDAD: responder igual si existe o no (evita enumeración de emails)
+    const respuestaGenerica = {
+      mensaje: 'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.'
+    };
+
+    if (!usuario) {
+      return res.json(respuestaGenerica);
+    }
+
+    if (usuario.eliminado) {
+      return res.json(respuestaGenerica);
+    }
+
+    // Generar token aleatorio (32 bytes = 64 chars hex)
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // Guardar en BD con expiración de 1 hora
+    usuario.resetPasswordToken = token;
+    usuario.resetPasswordExpira = new Date(Date.now() + 60 * 60 * 1000); // +1 hora
+    await usuario.save();
+
+    // Enviar email (no bloqueante)
+    try {
+      await enviarEmailResetPassword({ usuario, token });
+    } catch (emailErr) {
+      console.error('Error enviando email de reset:', emailErr.message);
+      // No fallar la respuesta si el email no se envía
+    }
+
+    // Registrar en auditoría
+    await registrarManual({
+      req,
+      usuario,
+      accion: 'solicitar_reset_password',
+      entidad: 'Auth',
+      exito: true
+    });
+
+    res.json(respuestaGenerica);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password/:token
+// Cambia la contraseña con el token
+router.post('/reset-password/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password, passwordConfirm } = req.body;
+
+    // Validaciones básicas
+    if (!password || !passwordConfirm) {
+      return res.status(400).json({ error: 'Password y confirmación son obligatorios' });
+    }
+
+    if (password !== passwordConfirm) {
+      return res.status(400).json({ error: 'Las contraseñas no coinciden' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
+    // Buscar al usuario con ese token
+    const usuario = await Usuario.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpira: { $gt: new Date() } // no expirado
+    });
+
+    if (!usuario) {
+      return res.status(400).json({
+        error: 'Token inválido o expirado. Solicita un nuevo enlace.'
+      });
+    }
+
+    // Actualizar contraseña
+    usuario.password = await bcrypt.hash(password, 10);
+
+    // Limpiar el token (para que no se reutilice)
+    usuario.resetPasswordToken = null;
+    usuario.resetPasswordExpira = null;
+
+    await usuario.save();
+
+    // Registrar en auditoría
+    await registrarManual({
+      req,
+      usuario,
+      accion: 'reset_password_exitoso',
+      entidad: 'Auth',
+      exito: true
+    });
+
+    res.json({
+      mensaje: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.'
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
