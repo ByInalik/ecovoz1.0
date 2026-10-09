@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Leaf, LogOut, User, Menu } from 'lucide-react';
+import { Leaf, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,10 +13,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import MobileMenu from './MobileMenu';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 export default function Navbar() {
   const navigate = useNavigate();
   const { usuario, isAuthenticated, logout } = useAuthStore();
+  const esMovil = useMediaQuery('(max-width: 767px)');
 
   const handleLogout = () => {
     logout();
@@ -39,6 +42,12 @@ export default function Navbar() {
         ? '/funcionario/dashboard'
         : '/ciudadano/dashboard';
 
+  // 🎯 En móvil: usar StaggeredMenu
+  if (esMovil) {
+    return <MobileMenu />;
+  }
+
+  // 🖥️ En desktop: navbar pill actual
   return (
     <header className="fixed top-4 left-0 right-0 z-50 px-4">
       <div className="container max-w-6xl mx-auto">
