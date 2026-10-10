@@ -47,7 +47,7 @@ export default function Navbar() {
     return <MobileMenu />;
   }
 
-  // 🖥️ En desktop: navbar pill actual
+  // 🖥️ En desktop: navbar pill
   return (
     <header className="fixed top-4 left-0 right-0 z-50 px-4">
       <div className="container max-w-6xl mx-auto">
@@ -69,48 +69,98 @@ export default function Navbar() {
           <nav className="hidden md:flex items-center gap-1">
             {!isAuthenticated ? (
               <>
-                <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                  <Link to="/#caracteristicas">Características</Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  render={<Link to="/#caracteristicas" />}
+                >
+                  Características
                 </Button>
-                <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                  <Link to="/#como-funciona">Cómo funciona</Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  render={<Link to="/#como-funciona" />}
+                >
+                  Cómo funciona
                 </Button>
-                <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                  <Link to="/#contacto">Contacto</Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  render={<Link to="/#contacto" />}
+                >
+                  Contacto
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                  <Link to={dashboardRoute}>Panel</Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  render={<Link to={dashboardRoute} />}
+                >
+                  Panel
                 </Button>
                 {usuario?.rol === 'ciudadano' && (
                   <>
-                    <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                      <Link to="/ciudadano/reportes/nuevo">Reportar</Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full"
+                      render={<Link to="/ciudadano/reportes/nuevo" />}
+                    >
+                      Reportar
                     </Button>
-                    <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                      <Link to="/ciudadano/mapa">Mapa</Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full"
+                      render={<Link to="/ciudadano/mapa" />}
+                    >
+                      Mapa
                     </Button>
                   </>
                 )}
                 {usuario?.rol === 'funcionario' && (
                   <>
-                    <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                      <Link to="/funcionario/moderacion">Moderar</Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full"
+                      render={<Link to="/funcionario/moderacion" />}
+                    >
+                      Moderar
                     </Button>
-                    <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                      <Link to="/funcionario/estadisticas">Estadísticas</Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full"
+                      render={<Link to="/funcionario/estadisticas" />}
+                    >
+                      Estadísticas
                     </Button>
                   </>
                 )}
                 {usuario?.rol === 'admin' && (
                   <>
-                    <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                      <Link to="/admin/usuarios">Usuarios</Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full"
+                      render={<Link to="/admin/usuarios" />}
+                    >
+                      Usuarios
                     </Button>
-                    <Button variant="ghost" size="sm" className="rounded-full" asChild>
-                      <Link to="/admin/auditoria">Auditoría</Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full"
+                      render={<Link to="/admin/auditoria" />}
+                    >
+                      Auditoría
                     </Button>
                   </>
                 )}
@@ -128,12 +178,16 @@ export default function Navbar() {
                   variant="ghost"
                   size="sm"
                   className="rounded-full hidden sm:flex"
-                  asChild
+                  render={<Link to="/login" />}
                 >
-                  <Link to="/login">Iniciar sesión</Link>
+                  Iniciar sesión
                 </Button>
-                <Button size="sm" className="rounded-full" asChild>
-                  <Link to="/registro">Registrarse</Link>
+                <Button
+                  size="sm"
+                  className="rounded-full"
+                  render={<Link to="/registro" />}
+                >
+                  Registrarse
                 </Button>
               </>
             ) : (
@@ -163,17 +217,19 @@ export default function Navbar() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to={dashboardRoute} className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      Mi panel
-                    </Link>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    render={<Link to={dashboardRoute} />}
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Mi panel
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/perfil" className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      Mi perfil
-                    </Link>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    render={<Link to="/perfil" />}
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Mi perfil
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
